@@ -312,7 +312,7 @@ public class Link<T> implements HierarchicalLevel {
 			Log.debug(this, "dataId %d: calling channel.receiveLinkPacketBody()", dataId);
 			if(!channel.isOpen()) {
 				Log.msg(this, "channel %s is not open, opening...", channel);
-				channel.open(true);
+				channel.open(false);
 			}
 			channel.receiveLinkPacketBody(dataId, channelId, byteBuf, length);
 		} else {
