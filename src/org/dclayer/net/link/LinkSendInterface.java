@@ -4,6 +4,6 @@ import org.dclayer.net.Data;
 /**
  * interface used by {@link Link} instances to send packets
  */
-public interface LinkSendInterface {
-	public void sendLinkPacket(Link link, Data data);
+public interface LinkSendInterface<T> {
+	public void sendLinkPacket(T referenceObject, Data data);
 }

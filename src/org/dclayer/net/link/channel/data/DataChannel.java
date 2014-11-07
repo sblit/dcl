@@ -4,9 +4,11 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
+import org.dclayer.net.buf.AsyncPipeByteBuf;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.buf.DataByteBuf;
-import org.dclayer.net.buf.SyncPipeByteBuf;
+import org.dclayer.net.buf.ListenerByteBuf;
+import org.dclayer.net.buf.ListenerByteBufInterface;
 import org.dclayer.net.buf.TransparentByteBuf;
 import org.dclayer.net.link.Link;
 import org.dclayer.net.link.channel.Channel;
@@ -23,18 +25,19 @@ import org.dclayer.net.link.control.packetbackup.PacketBackupCollection;
  * abstract base class for all {@link Channel} implementations that are no management channels
  * (i.e. all {@link Channel}s on a {@link Link} except its {@link ManagementChannel})
  */
-public abstract class DataChannel extends Channel implements Runnable {
+public abstract class DataChannel extends Channel implements ListenerByteBufInterface {
 	
 	/**
-	 * Thread that is calling the abstract {@link DataChannel#readConstantly(ByteBuf)} function
-	 */
-	private Thread thread = new Thread(this);
-	/**
-	 * the {@link SyncPipeByteBuf} that is used to pipe received data from the {@link DataChannel#read(ByteBuf, int)} method
+	 * the {@link AsyncPipeByteBuf} that is used to pipe received data from the {@link DataChannel#read(ByteBuf, int)} method
 	 * (which is invoked on the {@link Link} thread) to the {@link DataChannel#readConstantly(ByteBuf)} method
 	 * (which is invoked on this {@link DataChannel}'s Thread {@link DataChannel#thread}). 
 	 */
-	private SyncPipeByteBuf syncPipeByteBuf = new SyncPipeByteBuf();
+	private AsyncPipeByteBuf asyncPipeByteBuf = new AsyncPipeByteBuf(1024);
+	
+	private int sendDataByteBufSize = 256; // TODO
+	private DataByteBuf sendDataByteBuf = new DataByteBuf(sendDataByteBufSize);
+	
+	private ByteBuf writeByteBuf = new ListenerByteBuf(this);
 	
 	/**
 	 * the data id of the last packet
@@ -92,11 +95,6 @@ public abstract class DataChannel extends Channel implements Runnable {
 	
 	public DataChannel(Link link, long channelId, String channelName) {
 		super(link, channelId, channelName);
-	}
-
-	@Override
-	public void start() {
-		thread.start();
 	}
 	
 	@Override
@@ -218,30 +216,22 @@ public abstract class DataChannel extends Channel implements Runnable {
 	 */
 	private void read(ByteBuf byteBuf, int length) {
 		Log.debug(this, "read(length %d) ...", length);
-		// TODO
-		// DO NOT REMOVE THE SYNC-PIPE-BYTEBUF! synchronization in Link can not handle both Sync- and AsyncPipeByteBuf!
-		// EDIT 2014-06-09: It should be able to now, since using Locks
-		syncPipeByteBuf.write(byteBuf, length);
+		try {
+			asyncPipeByteBuf.write(byteBuf, length);
+		} catch(BufException e) {
+			Log.exception(this, e);
+		}
 		Log.debug(this, "... read(length %d) done", length);
 	}
 	
 	/**
-	 * called from {@link DataChannel#thread}
-	 */
-	@Override
-	public void run() {
-		readConstantly(syncPipeByteBuf);
-		// TODO if this returns, close the channel
-	}
-	
-	/**
 	 * sends the given {@link ChannelDataComponent}
-	 * @param channelDataComponent the {@link ChannelDataComponent} to send
+	 * @param channelData the {@link Data} to send
 	 */
 	// locks sendLock
-	protected void send(ChannelDataComponent channelDataComponent) {
+	protected void send(Data channelData) {
 
-		int channelDataComponentLength = channelDataComponent.length();
+		int channelDataComponentLength = channelData.length();
 
 		sendLock.lock();
 
@@ -255,7 +245,7 @@ public abstract class DataChannel extends Channel implements Runnable {
 		PacketBackup packetBackup = sentPacketBackupCollection.put(dataId, getChannelId(), FlowControl.PRIO_DATA);
 		Data data = packetBackup.getPacketProperties().data;
 
-		Log.debug(this, "sending: %s", channelDataComponent.represent(true));
+		Log.debug(this, "sending %d bytes", channelDataComponentLength);
 
 		// this will prepare the Data, write the LinkPacketHeader and return the length of the LinkPacketHeader
 		int offset;
@@ -275,7 +265,7 @@ public abstract class DataChannel extends Channel implements Runnable {
 		}
 
 		try {
-			channelDataComponent.write(linkPacketBodyByteBuf);
+			linkPacketBodyByteBuf.write(channelData);
 		} catch (BufException e) {
 			e.printStackTrace();
 			sendLock.unlock();
@@ -290,11 +280,32 @@ public abstract class DataChannel extends Channel implements Runnable {
 
 	}
 	
-	/**
-	 * called by this {@link DataChannel}'s Thread {@link DataChannel#thread}.<br />
-	 * only return from this method if this channel should be closed.
-	 * @param byteBuf
-	 */
-	public abstract void readConstantly(ByteBuf byteBuf);
+	public synchronized void flush() {
+		Data data = sendDataByteBuf.getData();
+		data.reset(0, sendDataByteBuf.getPosition());
+		send(data);
+		sendDataByteBuf.prepare(sendDataByteBufSize);
+	}
+	
+	@Override
+	public synchronized void onWrite(byte b) throws BufException {
+		sendDataByteBuf.write(b);
+		if(sendDataByteBuf.getPosition() >= sendDataByteBufSize) {
+			flush();
+		}
+	}
+	
+	@Override
+	public byte onRead() throws BufException {
+		return 0;
+	}
+	
+	public ByteBuf getReadByteBuf() {
+		return asyncPipeByteBuf;
+	}
+	
+	public ByteBuf getWriteByteBuf() {
+		return writeByteBuf;
+	}
 	
 }

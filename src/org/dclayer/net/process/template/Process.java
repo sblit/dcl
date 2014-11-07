@@ -4,12 +4,12 @@ import org.dclayer.exception.net.process.PropertyMethodNotImplementedException;
 import org.dclayer.listener.net.FollowUpProcessSpawnInterface;
 import org.dclayer.net.RevisionMessage;
 import org.dclayer.net.a2s.ApplicationConnection;
-import org.dclayer.net.addresscache.AddressCache;
-import org.dclayer.net.addresscache.CachedServiceAddress;
 import org.dclayer.net.filter.ApplicationConnectionFilter;
 import org.dclayer.net.filter.CachedServiceAddressFilter;
 import org.dclayer.net.filter.MessageFilter;
 import org.dclayer.net.link.Link;
+import org.dclayer.net.llacache.AddressCache;
+import org.dclayer.net.llacache.CachedServiceAddress;
 
 /**
  * a part of DCL's message processing mechanism that can provide and/or request different properties, such as: provide an address and a message to be sent to that address, accept specific messages from all or one specific address, request the spawning other {@link Process}es, etc.

@@ -478,15 +478,16 @@ public abstract class ManagementChannel extends Channel {
 	}
 	
 	@Override
-	public final void start() {
+	public final void onOpen(boolean initiator) {
 		resendThread.start();
-		startChannel();
+		onOpenChannel(initiator);
 	}
 	
 	/**
-	 * called when the channel is started
+	 * called when the channel is actually opened
+	 * @param initiator true if we requested this channel, false if the remote requested it
 	 */
-	protected abstract void startChannel();
+	protected abstract void onOpenChannel(boolean initiator);
 	/**
 	 * called upon receipt of a command
 	 * @param discontinuousBlock the {@link DiscontinuousBlock} of this message

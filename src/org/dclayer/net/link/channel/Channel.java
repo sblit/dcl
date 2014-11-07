@@ -29,6 +29,8 @@ public abstract class Channel implements HierarchicalLevel {
 	 */
 	private String channelName;
 	
+	private boolean open = false;
+	
 	public Channel(Link link, long channelId, String channelName) {
 		this.link = link;
 		this.channelId = channelId;
@@ -40,6 +42,15 @@ public abstract class Channel implements HierarchicalLevel {
 	 */
 	public Link getLink() {
 		return link;
+	}
+	
+	public boolean isOpen() {
+		return open;
+	}
+	
+	public void open(boolean initiator) {
+		this.open = true;
+		onOpen(initiator);
 	}
 	
 	@Override
@@ -87,9 +98,11 @@ public abstract class Channel implements HierarchicalLevel {
 	}
 	
 	/**
-	 * starts this channel
+	 * called when this channel is actually opened (either requested by the
+	 * remote and accepted or requested locally and confirmed by the remote)
+	 * @param initiator true if we requested this channel, false if the remote requested it
 	 */
-	public abstract void start();
+	protected abstract void onOpen(boolean initiator);
 	/**
 	 * called upon receipt of a link packet destined on this channel
 	 * @param dataId the data id of the link packet

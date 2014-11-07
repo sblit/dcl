@@ -1,8 +1,8 @@
 package org.dclayer.net.process.deliveryagent;
 
 import org.dclayer.net.a2s.ApplicationConnection;
-import org.dclayer.net.addresscache.CachedServiceAddress;
 import org.dclayer.net.filter.MessageFilter;
+import org.dclayer.net.llacache.CachedServiceAddress;
 import org.dclayer.net.process.template.Process;
 
 /**

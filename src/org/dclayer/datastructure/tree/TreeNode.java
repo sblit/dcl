@@ -1,5 +1,7 @@
 package org.dclayer.datastructure.tree;
 
+import org.dclayer.net.Data;
+
 /**
  * abstract class for tree nodes
  * @param <T> the type of the value
@@ -11,19 +13,19 @@ public abstract class TreeNode<T> {
 	 * @param key the key to return the value for
 	 * @return the value for the given key
 	 */
-	public abstract T get(long key);
+	public abstract T get(Data key);
 	/**
 	 * removes and returns the value for the given key
 	 * @param key the key to remove and return the value for
 	 * @return the value for the given key
 	 */
-	public abstract T remove(long key);
+	public abstract T remove(Data key);
 	/**
 	 * stores the given value for the given key
 	 * @param key the key to store the value for
 	 * @param value the value to store for the key
 	 */
-	public abstract void put(long key, T value);
+	public abstract void put(Data key, T value);
 	
 	/**
 	 * returns true if this is a {@link FinalTreeNode}, false if this is a {@link ParentTreeNode}
@@ -31,10 +33,10 @@ public abstract class TreeNode<T> {
 	 */
 	public abstract boolean isFinal();
 	/**
-	 * returns the key of this {@link FinalTreeNode} (zero if this is not an instance of {@link FinalTreeNode})
-	 * @return the key of this {@link FinalTreeNode} (zero if this is not an instance of {@link FinalTreeNode})
+	 * returns the key of this {@link FinalTreeNode} (null if this is not an instance of {@link FinalTreeNode})
+	 * @return the key of this {@link FinalTreeNode} (null if this is not an instance of {@link FinalTreeNode})
 	 */
-	public abstract long getFinalKey();
+	public abstract Data getFinalKey();
 	/**
 	 * returns the value of this {@link FinalTreeNode} (null if this is not an instance of {@link FinalTreeNode})
 	 * @return the value of this {@link FinalTreeNode} (null if this is not an instance of {@link FinalTreeNode})

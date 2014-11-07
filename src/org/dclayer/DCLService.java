@@ -1,10 +1,16 @@
 package org.dclayer;
 
 import java.io.IOException;
-import java.net.Inet4Address;
-import java.net.Inet6Address;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.util.List;
 
+import org.dclayer.PreLinkCommunicationManager.Result;
+import org.dclayer.apbr.APBRPacket;
+import org.dclayer.apbr.APBRPacketForwardDestination;
+import org.dclayer.crypto.Crypto;
+import org.dclayer.crypto.key.KeyPair;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.listener.net.FollowUpProcessSpawnInterface;
@@ -13,35 +19,45 @@ import org.dclayer.listener.net.OnProcessTimeoutListener;
 import org.dclayer.listener.net.OnReceiveListener;
 import org.dclayer.listener.net.ProcessRemoveInterface;
 import org.dclayer.listener.net.ReceiveFollowUpProcessSpawnInterface;
+import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
+import org.dclayer.net.Data;
 import org.dclayer.net.RevisionMessage;
 import org.dclayer.net.a2s.ApplicationConnection;
 import org.dclayer.net.a2s.ConnectedPacket;
-import org.dclayer.net.addresscache.AddressCache;
-import org.dclayer.net.addresscache.CachedServiceAddress;
+import org.dclayer.net.address.APBRAddress;
+import org.dclayer.net.address.Address;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.buf.DataByteBuf;
+import org.dclayer.net.interservice.InterserviceChannel;
+import org.dclayer.net.interservice.InterserviceChannelActionListener;
 import org.dclayer.net.link.Link;
-import org.dclayer.net.process.A2SBindReceiveProcess;
-import org.dclayer.net.process.A2SKnownAddressesRequestReceiveProcess;
-import org.dclayer.net.process.KnownAddressesRequestReceiveProcess;
-import org.dclayer.net.process.PingProcess;
-import org.dclayer.net.process.PingReceiveProcess;
-import org.dclayer.net.process.PingRedirectReceiveProcess;
-import org.dclayer.net.process.PongRedirectReceiveProcess;
+import org.dclayer.net.link.Link.Status;
+import org.dclayer.net.link.LinkSendInterface;
+import org.dclayer.net.link.OnLinkActionListener;
+import org.dclayer.net.link.channel.data.DataChannel;
+import org.dclayer.net.llacache.AddressCache;
+import org.dclayer.net.llacache.CachedLLA;
+import org.dclayer.net.llacache.CachedServiceAddress;
+import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.llacache.LLACache;
+import org.dclayer.net.lladatabase.LLADatabase;
+import org.dclayer.net.network.NetworkPacket;
+import org.dclayer.net.network.NetworkSlot;
+import org.dclayer.net.network.NetworkType;
+import org.dclayer.net.network.NetworkTypeCollection;
 import org.dclayer.net.process.deliveryagent.A2SProcessDeliveryAgent;
 import org.dclayer.net.process.deliveryagent.ProcessReceiveQueue;
 import org.dclayer.net.process.queue.ProcessTimeoutQueue;
 import org.dclayer.net.process.template.Process;
+import org.dclayer.net.routing.Nexthops;
+import org.dclayer.net.routing.RoutingTable;
 import org.dclayer.net.s2s.AddressedPacket;
-import org.dclayer.net.serviceaddress.ServiceAddress;
-import org.dclayer.net.serviceaddress.ServiceAddressIPv4;
-import org.dclayer.net.serviceaddress.ServiceAddressIPv6;
 import org.dclayer.net.socket.TCPSocket;
 import org.dclayer.net.socket.TCPSocketConnection;
 import org.dclayer.net.socket.UDPSocket;
 
-public class DCLService implements OnReceiveListener, OnProcessTimeoutListener, FollowUpProcessSpawnInterface, ProcessRemoveInterface, ReceiveFollowUpProcessSpawnInterface {
+public class DCLService implements APBRPacketForwardDestination, OnReceiveListener, LinkSendInterface<CachedLLA>, OnLinkActionListener<CachedLLA>, InterserviceChannelActionListener, HierarchicalLevel, OnProcessTimeoutListener, FollowUpProcessSpawnInterface, ProcessRemoveInterface, ReceiveFollowUpProcessSpawnInterface {
 	
 	/**
 	 * local ProcessTimeoutQueue
@@ -71,17 +87,33 @@ public class DCLService implements OnReceiveListener, OnProcessTimeoutListener, 
 	 */
 	private AddressCache addressCache;
 	
-	public DCLService(int s2sPort, int a2sPort, AddressCache addressCache) throws IOException {
+	private LLACache llaCache = new LLACache();
+	private LLADatabase llaDatabase;
+	
+	private APBRAddress localAddress;
+	
+	private PreLinkCommunicationManager preLinkCommunicationManager = new PreLinkCommunicationManager(this);
+	
+	private ConnectionInitiationManager connectionInitiationManager;
+	
+	public DCLService(int s2sPort, int a2sPort, LLADatabase llaDatabase) throws IOException {
 		
-		this.addressCache = addressCache;
+		this.llaDatabase = llaDatabase;
+		
+		Log.debug(this, "generating APBR address RSA keypair...");
+		KeyPair addressKeyPair = Crypto.generateAPBRAddressRSAKeyPair();
+		Log.debug(this, "done, public key: %s (%d bits)", addressKeyPair.getPublicKey().toString(), addressKeyPair.getPublicKey().getNumBits());
+		this.localAddress = new APBRAddress(addressKeyPair, new NetworkTypeCollection());
 		
 		processTimeoutQueue = new ProcessTimeoutQueue(this);
 		
 		processReceiveQueue = new ProcessReceiveQueue(this, addressCache);
 		a2sProcessDeliveryAgent = new A2SProcessDeliveryAgent(this);
 		
-		udpSocket = new UDPSocket(s2sPort, this);
+		udpSocket = new UDPSocket(this, s2sPort, this);
 		tcpSocket = new TCPSocket(a2sPort, this);
+		
+		this.connectionInitiationManager = new ConnectionInitiationManager(this);
 		
 //		// TODO REMOVE
 //		try {
@@ -91,14 +123,18 @@ public class DCLService implements OnReceiveListener, OnProcessTimeoutListener, 
 //			e.printStackTrace();
 //		}
 		
-		this.addProcess(new PingReceiveProcess()); // TODO move somewhere more special
-		this.addProcess(new PingRedirectReceiveProcess());
-		this.addProcess(new PongRedirectReceiveProcess());
-		this.addProcess(new KnownAddressesRequestReceiveProcess());
-		this.addProcess(new PingProcess());
-		
-		this.addProcess(new A2SBindReceiveProcess(this, this));
-		this.addProcess(new A2SKnownAddressesRequestReceiveProcess());
+//		this.addProcess(new PingReceiveProcess()); // TODO move somewhere more special
+//		this.addProcess(new PingRedirectReceiveProcess());
+//		this.addProcess(new PongRedirectReceiveProcess());
+//		this.addProcess(new KnownAddressesRequestReceiveProcess());
+//		this.addProcess(new PingProcess());
+//		
+//		this.addProcess(new A2SBindReceiveProcess(this, this));
+//		this.addProcess(new A2SKnownAddressesRequestReceiveProcess());
+	}
+	
+	public APBRAddress getServiceAPBRAddress() {
+		return localAddress;
 	}
 	
 	/**
@@ -107,6 +143,96 @@ public class DCLService implements OnReceiveListener, OnProcessTimeoutListener, 
 	 */
 	public ProcessReceiveQueue getProcessReceiveQueue() {
 		return processReceiveQueue;
+	}
+	
+	public LLACache getLLACache() {
+		return llaCache;
+	}
+	
+	// TODO remove!
+	public List<LLA> getLLAs() {
+		return llaDatabase.getLLAs();
+	}
+	
+	public void storeLLAs(List<LLA> llas) {
+		llaDatabase.store(llas);
+	}
+	
+	@Override
+	public void onReadyChange(InterserviceChannel interserviceChannel, boolean ready) {
+		if(ready) {
+			CachedLLA cachedLLA = interserviceChannel.getCachedLLA();
+			cachedLLA.setStatus(CachedLLA.CONNECTED);
+			Log.debug(this, "interservice channel to LLA %s ready", cachedLLA);
+			
+			// TODO decide how to continue (just leave it here, prove an address or even request integration?)
+			
+			// for now, if we actively connected to that LLA, let's prove our address
+			if(interserviceChannel.isInitiator()) {
+				interserviceChannel.startTrustedSwitch();
+			}
+		}
+	}
+	
+	@Override
+	public void onInConnectionBaseChange(InterserviceChannel interserviceChannel, byte oldInConnectionBase, byte newInConnectionBase) {
+		if(newInConnectionBase >= InterserviceChannel.CONNECTIONBASE_TRUSTED) {
+			// TODO carry out appropriate actions (i.e. begin routing, etc.)
+		} else if(newInConnectionBase <= InterserviceChannel.CONNECTIONBASE_STRANGER) {
+			// TODO carry out appropriate actions (i.e. stop routing, etc.)
+		}
+	}
+	
+	@Override
+	public void onRemoteNetworkJoin(InterserviceChannel interserviceChannel, NetworkType networkType, Data remoteAddressData) {
+		
+		Address localAddress = interserviceChannel.getLocalAddress();
+		
+		// TODO also check if we should maybe join that network
+		
+		NetworkType localNetworkType = localAddress.getNetworkTypeCollection().findLocal(networkType);
+		
+		if(localNetworkType != null) {
+			
+			RoutingTable routingTable = localNetworkType.getRoutingTable();
+			boolean added = routingTable.add(remoteAddressData, interserviceChannel);
+			
+			if(added) {
+				Log.debug(this, "added scaled address %s (%s) to routing table for %s", remoteAddressData, localNetworkType, networkType.getScaledAddress());
+			}
+			
+		}
+		
+	}
+	
+	@Override
+	public void onRemoteNetworkLeave(InterserviceChannel interserviceChannel, NetworkType networkType, Data addressData) {
+		// TODO remove route for that network and the remote's address
+	}
+
+	@Override
+	public boolean onNetworkPacket(InterserviceChannel interserviceChannel, NetworkPacket networkPacket) {
+		
+		NetworkSlot networkSlot = networkPacket.getNetworkSlot();
+		
+		Nexthops nexthops = networkSlot.getNetworkType().getRoutingTable().lookup(networkPacket.getDestinationAddressData(), networkSlot.getAddressData(), 0);
+		if(nexthops != null) {
+			return nexthops.forward(networkPacket);
+		}
+		
+		return false;
+		
+	}
+
+	@Override
+	public boolean onForward(APBRPacket apbrPacket) {
+		Log.warning(this, "TODO: implement onForward(): %s", apbrPacket);
+		return true;
+	}
+
+	@Override
+	public Address getAddress() {
+		return localAddress;
 	}
 	
 	/**
@@ -148,33 +274,6 @@ public class DCLService implements OnReceiveListener, OnProcessTimeoutListener, 
 	}
 
 	@Override
-	public void onReceiveS2S(InetAddress inetAddress, int port, ByteBuf byteBuf) {
-		ServiceAddress serviceAddress;
-		if(inetAddress instanceof Inet4Address) {
-			serviceAddress = new ServiceAddressIPv4((Inet4Address)inetAddress, port);
-		} else if(inetAddress instanceof Inet6Address) {
-			serviceAddress = new ServiceAddressIPv6((Inet6Address)inetAddress, port);
-		} else {
-			Log.error(Log.PART_NET_SERVICE_RECEIVES2S, this, String.format("cannot process packet due to unsupported address (type '%s'): %s", inetAddress.getClass().getName(), inetAddress.toString()));
-			return;
-		}
-		
-		AddressedPacket packet;
-		try {
-			packet = new AddressedPacket(byteBuf, serviceAddress);
-		} catch (BufException e) {
-			Log.exception(Log.PART_NET_SERVICE_RECEIVES2S, this, e);
-			return;
-		} catch (ParseException e) {
-			Log.exception(Log.PART_NET_SERVICE_RECEIVES2S, this, e);
-			return;
-		}
-		Log.debug(Log.PART_NET_SERVICE_RECEIVES2S, this, String.format("received Service-to-Service Packet from %s (%s:%d): \n%s", serviceAddress.toString(), inetAddress.toString(), port, packet.represent(true)));
-		
-		processReceiveQueue.receive(packet);
-	}
-
-	@Override
 	public boolean onReceiveA2S(TCPSocketConnection tcpSocketConnection, ByteBuf byteBuf) {
 		boolean keep = processOnReceiveA2S(tcpSocketConnection, byteBuf);
 		if(!keep) {
@@ -182,6 +281,128 @@ public class DCLService implements OnReceiveListener, OnProcessTimeoutListener, 
 			if(onConnectionErrorListener != null) onConnectionErrorListener.onConnectionError();
 		}
 		return keep;
+	}
+
+	@Override
+	public void onReceiveS2S(InetSocketAddress inetSocketAddress, DataByteBuf dataByteBuf) {
+		
+		InetAddress inetAddress = inetSocketAddress.getAddress();
+		int port = inetSocketAddress.getPort();
+		
+		Link link;
+		
+		CachedLLA cachedLLA = llaCache.getIPPortCachedLLA(inetAddress, port, false);
+		
+		if(cachedLLA == null) {
+			
+			// we're being connected to
+			
+			Result result = preLinkCommunicationManager.permit(inetAddress, port, dataByteBuf);
+			send(inetSocketAddress, result.echoData);
+			
+			if(result.done) {
+				cachedLLA = llaCache.getIPPortCachedLLA(inetAddress, port, true);
+				cachedLLA.setFirstLinkPacketPrefixData(result.firstLinkPacketPrefixData);
+			}
+			
+			return;
+			
+		}
+		
+		link = cachedLLA.getLink();
+		if(link == null) {
+			
+			if(cachedLLA.getFirstLinkPacketPrefixData() == null) {
+			
+				// we're connecting via pre-link communication
+				Result result = preLinkCommunicationManager.echo(dataByteBuf);
+				if(result.done) {
+					cachedLLA.setLink(link = new Link<CachedLLA>(this, this, cachedLLA));
+					cachedLLA.setStatus(CachedLLA.CONNECTING_LINK);
+					link.connect(result.firstLinkPacketPrefixData);
+					return;
+				}
+				
+				send(inetSocketAddress, result.echoData);
+				return;
+				
+			} else {
+				
+				// we're being connected to and pre-link communication is already completed
+				
+				Data prefixData = cachedLLA.getFirstLinkPacketPrefixData();
+				if(prefixData.equals(0, dataByteBuf.getData(), 0, prefixData.length())) {
+				
+					// the first link packet is prefixed with the expected data
+					// -> create the link and feed it the rest (the latter happens at the bottom of this method)
+					link = new Link<CachedLLA>(this, this, cachedLLA);
+					cachedLLA.setLink(link);
+					cachedLLA.setFirstLinkPacketPrefixData(null);
+					dataByteBuf.seek(prefixData.length());
+					
+				} else {
+					
+					// the remote most likely didn't get our last confirmation packet.
+					// -> repeat the pre-link communication
+					Result result = preLinkCommunicationManager.permit(inetAddress, port, dataByteBuf);
+					send(inetSocketAddress, result.echoData);
+					return;
+					
+				}
+				
+			}
+			
+		}
+		
+		// normal operation
+		link.onReceive(dataByteBuf);
+		
+	}
+
+	@Override
+	public void sendLinkPacket(CachedLLA cachedLLA, Data data) {
+		send(cachedLLA.getLLA().getSocketAddress(), data);
+	}
+	
+	private void send(SocketAddress inetSocketAddress, Data data) {
+		try {
+			udpSocket.send(inetSocketAddress, data);
+		} catch (IOException e) {
+			Log.exception(this, e, "Exception while sending link packet to %s", inetSocketAddress);
+			return;
+		}
+	}
+
+	@Override
+	public DataChannel onOpenChannelRequest(CachedLLA cachedLLA, long channelId, String protocol) {
+		switch(protocol) {
+		case "org.dclayer.interservice": {
+			cachedLLA.setStatus(CachedLLA.CONNECTING_CHANNEL);
+			InterserviceChannel interserviceChannel = new InterserviceChannel(this, this, cachedLLA, localAddress, channelId, protocol);
+			cachedLLA.setInterserviceChannel(interserviceChannel);
+			return interserviceChannel;
+		}
+		}
+		return null;
+	}
+
+	@Override
+	public void onLinkStatusChange(CachedLLA cachedLLA, Status oldStatus, Status newStatus) {
+		Link link = cachedLLA.getLink();
+		if(newStatus == Link.Status.Connected && link.isInitiator()) {
+			Log.debug(this, "link %s is connected, opening interservice channel", link);
+			link.openChannel("org.dclayer.interservice");
+		}
+	}
+
+	@Override
+	public HierarchicalLevel getParentHierarchicalLevel() {
+		return null;
+	}
+	
+	@Override
+	public String toString() {
+		return "DCLService";
 	}
 	
 	/**

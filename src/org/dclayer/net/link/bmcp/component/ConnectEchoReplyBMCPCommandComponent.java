@@ -3,8 +3,8 @@ import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.link.bmcp.BMCPManagementChannel;
-import org.dclayer.net.link.component.DataComponent;
 import org.dclayer.net.link.control.discontinuousblock.DiscontinuousBlock;
 
 /**

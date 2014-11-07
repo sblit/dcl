@@ -10,7 +10,7 @@ import org.dclayer.net.link.channel.component.DataChannelDataComponent;
 /**
  * a {@link DataChannel} implementation for tunneling application data
  */
-public class ApplicationDataChannel extends DataChannel {
+public class ApplicationDataChannel extends ThreadDataChannel {
 	
 	/**
 	 * interface for receivers of the tunneled application data
@@ -65,14 +65,10 @@ public class ApplicationDataChannel extends DataChannel {
 		}
 	}
 	
-	/**
-	 * sends the given {@link Data} over this {@link ApplicationDataChannel}
-	 * @param data the {@link Data} to send
-	 */
-	public synchronized void send(Data data) {
-		Log.debug(this, "sending %d bytes of data", data.length());
-		outDataChannelDataComponent.setData(data);
-		send(outDataChannelDataComponent);
+	@Override
+	public void send(Data data) {
+		super.send(data);
+		flush();
 	}
 	
 	/**
@@ -81,6 +77,12 @@ public class ApplicationDataChannel extends DataChannel {
 	 */
 	public void setOnChannelDataListener(OnChannelDataListener onChannelDataListener) {
 		this.onChannelDataListener = onChannelDataListener;
+	}
+
+	@Override
+	protected void onOpenChannel(boolean initiator) {
+		// TODO Auto-generated method stub
+		
 	}
 
 }

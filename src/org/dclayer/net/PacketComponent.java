@@ -78,14 +78,6 @@ public abstract class PacketComponent {
 		return represent(false);
 	}
 	
-	public abstract String toString();
-	
-	/**
-	 * returns a {@link PacketComponent} array containing the children of this {@link PacketComponent}
-	 * @return a {@link PacketComponent} array containing the children of this {@link PacketComponent}
-	 */
-	public abstract PacketComponent[] getChildren();
-	
 	/**
 	 * reconstructs the {@link PacketComponent} from data in the given {@link ByteBuf}
 	 * @param byteBuf the {@link ByteBuf} containing the data that should be used to reconstruct this {@link PacketComponent}
@@ -104,4 +96,13 @@ public abstract class PacketComponent {
 	 * @return the amount of bytes this {@link PacketComponent} will occupy if written to a {@link ByteBuf}
 	 */
 	public abstract int length();
+	
+	/**
+	 * returns a {@link PacketComponent} array containing the children of this {@link PacketComponent}
+	 * @return a {@link PacketComponent} array containing the children of this {@link PacketComponent}
+	 */
+	public abstract PacketComponent[] getChildren();
+
+	public abstract String toString();
+	
 }

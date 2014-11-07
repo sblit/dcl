@@ -3,6 +3,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 import org.dclayer.datastructure.tree.ParentTreeNode;
+import org.dclayer.net.Data;
 
 
 /**
@@ -19,11 +20,20 @@ public class ChannelCollection {
 	 */
 	private LinkedList<Channel> channelList = new LinkedList<Channel>();
 	
+	private Data channelKey = new Data(8);
+	
 	/**
 	 * creates a new, empty {@link ChannelCollection}
 	 */
 	public ChannelCollection() {
 		
+	}
+	
+	private void updateChannelKey(long channelId) {
+		for(int i = 0; i < 8; i++) {
+			channelKey.setByte(i, (byte)(channelId & 0xFF));
+			channelId >>= 8;
+		}
 	}
 	
 	/**
@@ -32,7 +42,8 @@ public class ChannelCollection {
 	 * @return the corresponding {@link Channel} object for the given channel id, if found, null otherwise
 	 */
 	public synchronized Channel get(long channelId) {
-		return channelTree.get(channelId);
+		updateChannelKey(channelId);
+		return channelTree.get(channelKey);
 	}
 	
 	/**
@@ -50,12 +61,13 @@ public class ChannelCollection {
 	 * @param channelId the channel id to assign the {@link Channel} to
 	 * @param channel the {@link Channel} to assign to the given channel id
 	 */
-	public void assign(long channelId, Channel channel) {
-		Channel oldChannel = channelTree.get(channelId);
+	public synchronized void assign(long channelId, Channel channel) {
+		updateChannelKey(channelId);
+		Channel oldChannel = channelTree.get(channelKey);
 		if(oldChannel != null) {
 			channelList.remove(oldChannel);
 		}
-		channelTree.put(channelId, channel);
+		channelTree.put(channelKey, channel);
 	}
 	
 	/**
@@ -63,7 +75,8 @@ public class ChannelCollection {
 	 * @param channelId the channel id to clear the {@link Channel} object for
 	 */
 	public synchronized void clear(long channelId) {
-		Channel channel = channelTree.remove(channelId);
+		updateChannelKey(channelId);
+		Channel channel = channelTree.remove(channelKey);
 		if(channel != null) {
 			channelList.remove(channel);
 		}

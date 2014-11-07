@@ -9,6 +9,7 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.component.FlexNum;
 import org.dclayer.net.link.Link;
 import org.dclayer.net.link.bmcp.component.AckBMCPCommandComponent;
@@ -31,7 +32,6 @@ import org.dclayer.net.link.bmcp.crypto.component.CryptoDataComponent;
 import org.dclayer.net.link.channel.Channel;
 import org.dclayer.net.link.channel.ChannelCollection;
 import org.dclayer.net.link.channel.management.ManagementChannel;
-import org.dclayer.net.link.component.DataComponent;
 import org.dclayer.net.link.control.discontinuousblock.DiscontinuousBlock;
 import org.dclayer.net.link.control.idcollection.IdBoundary;
 import org.dclayer.net.link.control.idcollection.IdCollection;
@@ -120,8 +120,9 @@ public class BMCPManagementChannel extends ManagementChannel {
 	}
 	
 	@Override
-	public void startChannel() {
+	public void onOpenChannel(boolean initiator) {
 		blockStatusThread.start();
+		if(initiator) connect();
 	}
 	
 	// locks receiveLock (theoretically, as long as ManegementChannel synchronizes calls to its read() function, no synchronization is needed here)
@@ -345,11 +346,11 @@ public class BMCPManagementChannel extends ManagementChannel {
 		// remove the ConnectEchoReply packet that is currently being actively resent from the sent-PacketBackupCollection
 		clear(currentPendingDataId, 0);
 		
-		getLink().setStatus(Link.Status.Connected);
-		
 		getLink().applyNewOutHeaderTransparentByteBuf();
 		
 		sendConnectConfirmation(discontinuousBlock);
+		
+		getLink().setStatus(Link.Status.Connected);
 		
 	}
 	
@@ -572,8 +573,22 @@ public class BMCPManagementChannel extends ManagementChannel {
 		
 		// TODO check if we really requested a new channel
 		
-		Log.debug(this, "channel open confirmed!");
+		long channelId = openChannelConfirmationBMCPCommandComponent.getChannelId();
 		
+		Channel channel = getLink().getChannelCollection().get(channelId);
+		
+		Log.debug(this, "opening of channel id %d (%s) confirmed", channelId, channel);
+		
+		if(channel != null) {
+			
+			if(channel.isOpen()) {
+				Log.debug(this, "channel %s is already open", channel);
+			} else {
+				channel.open(true);
+			}
+			
+		}
+
 		clear(openChannelConfirmationBMCPCommandComponent.getAckDataId(), 0);
 		
 	}
@@ -652,9 +667,8 @@ public class BMCPManagementChannel extends ManagementChannel {
 	/**
 	 * starts this {@link BMCPManagementChannel} and connects to the peer
 	 */
-	public void connect() {
+	private void connect() {
 		
-		start();
 		sendConnect();
 		
 	}

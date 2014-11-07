@@ -1,5 +1,7 @@
 package org.dclayer.datastructure.tree;
 
+import org.dclayer.net.Data;
+
 /**
  * a tree node with child nodes
  * @param <T> the type of the value
@@ -11,34 +13,34 @@ public class ParentTreeNode<T> extends TreeNode<T> {
 	 */
 	private final TreeNode<T>[] children = new TreeNode[256];
 	/**
-	 * the offset in bits from the key's least significant bit (0) to the key's most significant bit (63).
-	 * the 8 bits from bitOffset to bitOffset+7 specify the index for the children array
+	 * the offset in bytes from the key's most significant byte (at index 0) to the key's least significant byte (at index (key.length - 1)).
+	 * the byte at byteOffset specifies the index for the children array
 	 */
-	private final int bitOffset;
+	private final int byteOffset;
 	
 	/**
 	 * creates a new {@link ParentTreeNode} using the specified bitOffset value
-	 * @param bitOffset the offset in bits from the key's least significant bit (0) to the key's most significant bit (63). the 8 bits from bitOffset to bitOffset+7 specify the index for the children array
+	 * @param byteOffset the offset in bytes from the key's most significant byte (at index 0) to the key's least significant byte
 	 */
-	public ParentTreeNode(int bitOffset) {
-		this.bitOffset = bitOffset;
+	public ParentTreeNode(int byteOffset) {
+		this.byteOffset = byteOffset;
 	}
 
 	@Override
-	public T get(long key) {
-		final int i = (int)((key >> bitOffset) & 0xFF);
+	public T get(Data key) {
+		final int i = 0xFF & key.getByte(byteOffset);
 		TreeNode<T> child = children[i];
 		return (child == null) ? null : child.get(key);
 	}
 
 	@Override
-	public T remove(long key) {
-		final int i = (int)((key >> bitOffset) & 0xFF);
+	public T remove(Data key) {
+		final int i = 0xFF & key.getByte(byteOffset);
 		TreeNode<T> child = children[i];
 		if(child == null) {
 			return null;
 		}
-		if(child.isFinal() && child.getFinalKey() == key) {
+		if(child.isFinal() && child.getFinalKey().equals(key)) {
 			children[i] = null;
 			return child.getFinalValue();
 		} else {
@@ -47,15 +49,15 @@ public class ParentTreeNode<T> extends TreeNode<T> {
 	}
 
 	@Override
-	public void put(long key, T value) {
-		final int i = (int)((key >> bitOffset) & 0xFF);
+	public void put(Data key, T value) {
+		final int i = 0xFF & key.getByte(byteOffset);
 		TreeNode<T> child = children[i];
 		if(child == null) {
 			child = children[i] = new FinalTreeNode<T>();
 			child.put(key, value);
-		} else if(child.isFinal() && child.getFinalKey() != key) {
+		} else if(child.isFinal() && !child.getFinalKey().equals(key)) {
 			TreeNode<T> old = child;
-			child = children[i] = new ParentTreeNode<T>(bitOffset + 8);
+			child = children[i] = new ParentTreeNode<T>(byteOffset + 1);
 			child.put(old.getFinalKey(), old.getFinalValue());
 			child.put(key, value);
 		} else {
@@ -69,8 +71,8 @@ public class ParentTreeNode<T> extends TreeNode<T> {
 	}
 
 	@Override
-	public long getFinalKey() {
-		return 0;
+	public Data getFinalKey() {
+		return null;
 	}
 
 	@Override
@@ -85,7 +87,7 @@ public class ParentTreeNode<T> extends TreeNode<T> {
 
 	@Override
 	public String toString() {
-		return String.format("ParentTreeNode(bitOffset=%d)", bitOffset);
+		return String.format("ParentTreeNode(byteOffset=%d)", byteOffset);
 	}
 	
 }

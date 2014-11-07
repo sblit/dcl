@@ -2,9 +2,9 @@ package org.dclayer.net.process.template;
 
 import org.dclayer.listener.net.FollowUpProcessSpawnInterface;
 import org.dclayer.net.RevisionMessage;
-import org.dclayer.net.addresscache.CachedServiceAddress;
 import org.dclayer.net.filter.CachedServiceAddressFilter;
 import org.dclayer.net.filter.MessageFilter;
+import org.dclayer.net.llacache.CachedServiceAddress;
 
 /**
  * base class for persistent point-to-point service-to-service receiver {@link Process}es

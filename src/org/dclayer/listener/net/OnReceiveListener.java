@@ -1,8 +1,9 @@
 package org.dclayer.listener.net;
 
-import java.net.InetAddress;
+import java.net.InetSocketAddress;
 
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.buf.DataByteBuf;
 import org.dclayer.net.socket.TCPSocketConnection;
 
 /**
@@ -11,11 +12,10 @@ import org.dclayer.net.socket.TCPSocketConnection;
 public interface OnReceiveListener {
 	/**
 	 * Service-to-Service receive callback, called by UDPSocket
-	 * @param inetAddress the InetAddress this was received from
-	 * @param port the port this was received from
+	 * @param inetSocketAddress the InetSocketAddress this was received from
 	 * @param byteBuf ByteBuf holding the received data
 	 */
-	public void onReceiveS2S(InetAddress inetAddress, int port, ByteBuf byteBuf);
+	public void onReceiveS2S(InetSocketAddress inetSocketAddress, DataByteBuf byteBuf);
 	/**
 	 * Application-to-Service receive callback, called by TCPSocket
 	 * @param tcpSocketConnection the TCPSocketConnection this was received from

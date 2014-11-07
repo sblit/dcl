@@ -11,6 +11,13 @@ import java.util.LinkedList;
  * logging class used for message output
  */
 public class Log {
+	
+	public static final Class[][] IGNORE = new Class[][] {
+		// specify reserved paths here (e.g. { InterserviceChannel.class, DCLService.class, DCL.class })
+		// if the end of a log message's path matches one of the arrays below reserved, the message is not printed
+		new Class[] {  },
+	};
+	
 	public static String PART_MAIN = "main",
 			PART_NET_UDPSOCKET = "net/udpsocket",
 			PART_NET_TCPSOCKET = "net/tcpsocket",
@@ -180,7 +187,20 @@ public class Log {
 		return stringBuilder.toString();
 	}
 	
+	private static boolean ignore(HierarchicalLevel hierarchicalLevel) {
+		paths: for(Class[] reversePath : IGNORE) {
+			HierarchicalLevel l = hierarchicalLevel;
+			for(Class c : reversePath) {
+				if(l == null || c != l.getClass()) continue paths;
+				l = l.getParentHierarchicalLevel();
+			}
+			return true;
+		}
+		return false;
+	}
+	
 	private static void log(Level l, HierarchicalLevel hierarchicalLevel, String format, Object... args) {
+		if(ignore(hierarchicalLevel)) return;
 		println(String.format("%s [%s] %s: %s",
 				DATE_FORMAT.format(Calendar.getInstance().getTime()),
 				l.name(),
@@ -188,7 +208,33 @@ public class Log {
 				String.format(format, args)));
 	}
 	
+	private static void log(Level l, Object object, String format, Object... args) {
+		println(String.format("%s [%s] (%s %s): %s",
+				DATE_FORMAT.format(Calendar.getInstance().getTime()),
+				l.name(),
+				object.getClass().getCanonicalName(),
+				object.toString(),
+				String.format(format, args)));
+	}
+	
 	public static void debug(HierarchicalLevel hierarchicalLevel, String format, Object... args) {
 		log(Level.DEBUG, hierarchicalLevel, format, args);
 	}
+	
+	public static void warning(HierarchicalLevel hierarchicalLevel, String format, Object... args) {
+		log(Level.WARNING, hierarchicalLevel, format, args);
+	}
+	
+	public static void exception(HierarchicalLevel hierarchicalLevel, Exception e, String format, Object... args) {
+		log(Level.ERROR, hierarchicalLevel, format + ": %s", args, getStackTraceAsString(e));
+	}
+	
+	public static void exception(HierarchicalLevel hierarchicalLevel, Exception e) {
+		log(Level.ERROR, hierarchicalLevel, "%s", getStackTraceAsString(e));
+	}
+	
+	public static void exception(Object object, Exception e) {
+		log(Level.ERROR, object, "%s", getStackTraceAsString(e));
+	}
+	
 }

@@ -12,4 +12,8 @@ public class InvalidServiceAddressException extends ParseException {
 		super("Invalid service address");
 	}
 	
+	public InvalidServiceAddressException(Throwable t) {
+		super("Invalid service address", t);
+	}
+	
 }

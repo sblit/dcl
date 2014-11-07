@@ -1,6 +1,6 @@
 package org.dclayer.net.filter;
 
-import org.dclayer.net.addresscache.CachedServiceAddress;
+import org.dclayer.net.llacache.CachedServiceAddress;
 import org.dclayer.net.s2s.S2SPacket;
 
 /**

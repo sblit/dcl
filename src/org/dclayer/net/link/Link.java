@@ -26,7 +26,7 @@ import org.dclayer.net.link.control.packetbackup.PacketBackup;
 /**
  * a layer that is placed above the UDP socket and provides reliable and encrypted communication
  */
-public class Link implements HierarchicalLevel {
+public class Link<T> implements HierarchicalLevel {
 	
 	public static enum Status {
 		None,
@@ -43,9 +43,9 @@ public class Link implements HierarchicalLevel {
 	}
 	
 	/**
-	 * An {@link OnOpenChannelRequestListener} called upon opening of a new channel
+	 * An {@link OnLinkActionListener} called upon opening of a new channel
 	 */
-	private OnOpenChannelRequestListener onOpenChannelRequestListener;
+	private OnLinkActionListener<T> onLinkActionListener;
 	
 	/**
 	 * {@link LinkPacketHeader} for parsing inbound packets
@@ -125,20 +125,33 @@ public class Link implements HierarchicalLevel {
 	 */
 	private ReentrantLock sendLock = new ReentrantLock();
 	
+	private T referenceObject;
+	private LinkSendInterface<T> linkSendInterface;
+	
+	private Data packetPrefixData;
+	
+	private boolean initiator = false;
+	
 	/**
 	 * creates a new {@link Link}
 	 * @param linkSendInterface the {@link LinkSendInterface} to use
-	 * @param onOpenChannelRequestListener the {@link OnOpenChannelRequestListener} to use
+	 * @param onOpenChannelRequestListener the {@link OnLinkActionListener} to use
 	 */
-	public Link(LinkSendInterface linkSendInterface, OnOpenChannelRequestListener onOpenChannelRequestListener) {
-		this.flowControl = new FlowControl(this, linkSendInterface);
-		this.onOpenChannelRequestListener = onOpenChannelRequestListener;
+	public Link(LinkSendInterface<T> linkSendInterface, OnLinkActionListener<T> onOpenChannelRequestListener, T referenceObject) {
+		this.linkSendInterface = linkSendInterface;
+		this.flowControl = new FlowControl(this);
+		this.onLinkActionListener = onOpenChannelRequestListener;
+		this.referenceObject = referenceObject;
 	}
 
 	@Override
 	public HierarchicalLevel getParentHierarchicalLevel() {
 		// TODO
 		return null;
+	}
+	
+	public boolean isInitiator() {
+		return initiator;
 	}
 	
 	/**
@@ -162,8 +175,10 @@ public class Link implements HierarchicalLevel {
 	 * @param status the status to set
 	 */
 	public void setStatus(Status status) {
-		Log.debug(this, "setting status: %s", status);
+		Status oldStatus = this.status;
+		Log.debug(this, "setting status from %s to %s", this.status, status);
 		this.status = status;
+		onLinkActionListener.onLinkStatusChange(referenceObject, oldStatus, status);
 	}
 	
 	/**
@@ -295,6 +310,10 @@ public class Link implements HierarchicalLevel {
 		
 		if(channel != null) {
 			Log.debug(this, "dataId %d: calling channel.receiveLinkPacketBody()", dataId);
+			if(!channel.isOpen()) {
+				Log.debug(this, "channel %s is not open, opening...", channel);
+				channel.open(true);
+			}
 			channel.receiveLinkPacketBody(dataId, channelId, byteBuf, length);
 		} else {
 			Log.debug(this, "dataId %d: no channel with channelId %d, ignoring", dataId, channelId);
@@ -386,6 +405,7 @@ public class Link implements HierarchicalLevel {
 		Channel channel = newChannel(channelId, protocol);
 		if(channel != null) {
 			putChannel(channel);
+			channel.open(false);
 		}
 		
 		receiveLock.unlock();
@@ -418,10 +438,20 @@ public class Link implements HierarchicalLevel {
 		
 		Log.debug(this, "sending: %s", outLinkPacketHeader.represent(true));
 		
+		Data prefixData = this.packetPrefixData;
+		this.packetPrefixData = null;
+		if(prefixData != null) {
+			linkPacketHeaderLength += prefixData.length();
+		}
 		data.prepare(linkPacketHeaderLength + channelDataLength);
 		
 		// TODO make this more efficient (i.e. re-use DataByteBuf)
 		ByteBuf byteBuf = new DataByteBuf(data);
+		
+		if(prefixData != null) {
+			byteBuf.write(prefixData);
+		}
+		
 		ByteBuf headerWriteByteBuf;
 		
 		if(outHeaderTransparentByteBuf == null) {
@@ -461,13 +491,23 @@ public class Link implements HierarchicalLevel {
 		
 	}
 	
+	/**
+	 * called by the {@link FlowControl} when finally sending a packet
+	 * @param data the {@link Data} containing the packet
+	 */
+	public void transmitNow(Data data) {
+		linkSendInterface.sendLinkPacket(referenceObject, data);
+	}
+	
 	//
 	
 	/**
 	 * connects this link
 	 */
 	// locks receiveLock
-	public void connect() {
+	public void connect(Data firstLinkPacketPrefixData) {
+		
+		initiator = true;
 		
 		receiveLock.lock();
 		
@@ -480,10 +520,21 @@ public class Link implements HierarchicalLevel {
 		channelCollection.put(managementChannel);
 		// connect() starts the channel
 		
-		bmcpManagementChannel.connect();
+		if(firstLinkPacketPrefixData != null) {
+			this.packetPrefixData = firstLinkPacketPrefixData;
+		}
+		
+		bmcpManagementChannel.open(true);
 		
 		receiveLock.unlock();
 		
+	}
+	
+	/**
+	 * connects this link
+	 */
+	public void connect() {
+		connect(null);
 	}
 	
 	/**
@@ -494,7 +545,7 @@ public class Link implements HierarchicalLevel {
 	 */
 	// no synchronization needed
 	private DataChannel newChannel(long channelId, String protocol) {
-		return onOpenChannelRequestListener.onOpenChannelRequest(this, channelId, protocol);
+		return onLinkActionListener.onOpenChannelRequest(referenceObject, channelId, protocol);
 	}
 	
 	/**
@@ -515,7 +566,6 @@ public class Link implements HierarchicalLevel {
 			applicationChannelMap.put(channel.getChannelName(), (ApplicationDataChannel) channel);
 		}
 		channelCollection.put(channel);
-		channel.start();
 	}
 	
 	/**

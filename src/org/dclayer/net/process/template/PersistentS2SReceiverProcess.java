@@ -1,8 +1,8 @@
 package org.dclayer.net.process.template;
 
 import org.dclayer.net.RevisionMessage;
-import org.dclayer.net.addresscache.CachedServiceAddress;
 import org.dclayer.net.filter.MessageFilter;
+import org.dclayer.net.llacache.CachedServiceAddress;
 
 /**
  * base class for persistent service-to-service receiver {@link Process}es

@@ -74,6 +74,15 @@ public class Data {
 	}
 	
 	/**
+	 * resets offset relative to the current offset and sets length value
+	 * @param relativeOffset the relative offset specifying where the data starts in the byte array, relative to the current offset
+	 * @param length the length specifying how long the usable area of the byte array is
+	 */
+	public void relativeReset(int relativeOffset, int length) {
+		reset(offset+relativeOffset, length);
+	}
+	
+	/**
 	 * resets the byte array and the offset and length values
 	 * @param data the byte array to use
 	 * @param offset the offset specifying where the data starts in the byte array
@@ -133,6 +142,46 @@ public class Data {
 		return new Data(copyToByteArray());
 	}
 	
+	public long getBits(int bitOffset, int length) {
+		long bits = 0;
+		for(int i = 0; i < length;) {
+			
+			int cBitIndex = bitOffset + i;
+			int cOff = (cBitIndex % 8);
+			int cNum = Math.min(8 - cOff, length - i);
+			
+			byte b = this.data[cBitIndex/8];
+			
+			bits <<= cNum;
+			bits |= (b & (0xFF >> cOff)) >> (8-cOff-cNum);
+			
+			i += cNum;
+			
+		}
+		return bits;
+	}
+	
+	public void setBits(int bitOffset, int length, long bits) {
+		for(int i = 0; i < length;) {
+			
+			int cBitIndex = bitOffset + i;
+			int cOff = (cBitIndex % 8);
+			int cNum = Math.min(8 - cOff, length - i);
+			
+//			System.out.println(String.format("  cBitIndex=%d cOff=%d cNum=%d", cBitIndex, cOff, cNum));
+			
+			byte mask = (byte)(((1 << cNum)-1) << (8 - cNum - cOff));
+			byte b = (byte)((bits >> (length-i-cNum)) << (8 - cNum - cOff));
+//			System.out.println(String.format("  mask=%8s b=%8s", Integer.toBinaryString(mask & 0xFF), Integer.toBinaryString(b & 0xFF)));
+			
+			this.data[cBitIndex/8] &= ~mask;
+			this.data[cBitIndex/8] |= (b & mask);
+			
+			i += cNum;
+			
+		}
+	}
+	
 	/**
 	 * returns the byte at the specified index
 	 * @param index the index of the byte to return
@@ -149,6 +198,7 @@ public class Data {
 	 * @return the byte at index
 	 */
 	public void setByte(int index, byte b) {
+		if(index < 0) index += length;
 		this.data[offset + index] = b;
 	}
 	
@@ -173,4 +223,51 @@ public class Data {
 	public void getBytes(int index, int length, byte[] bytes, int offset) {
 		System.arraycopy(data, index, bytes, offset, length);
 	}
+	
+	@Override
+	public boolean equals(Object object) {
+		if(!(object instanceof Data)) return false;
+		Data data = (Data) object;
+		if(this.length != data.length) return false;
+		for(int i = 0; i < length; i++) {
+			if(this.data[i+this.offset] != data.data[i+data.offset]) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	public boolean equals(int thisOffset, Data otherData, int otherOffset, int length) {
+		if(this.length < (thisOffset+length) || otherData.length < (otherOffset+length)) return false;
+		for(int i = 0; i < length; i++) {
+			if(this.data[i+this.offset+thisOffset] != otherData.data[i+otherData.offset+otherOffset]) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	@Override
+	public int hashCode() {
+		int hash = 0;
+		for(int i = 0; i < length; i++) {
+			hash ^= (data[i+offset] << 8*(i % 4));
+		}
+		return hash;
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder stringBuilder = new StringBuilder(this.length() * 2);
+		byte nibble;
+		for(int i = 0; i < length; i++) {
+			byte b = data[i+offset];
+			nibble = (byte)((b >> 4) & 0xF);
+			stringBuilder.append((char)((nibble < 10) ? ('0'+nibble) : ('a'+(nibble-10))));
+			nibble = (byte)(b & 0xF);
+			stringBuilder.append((char)((nibble < 10) ? ('0'+nibble) : ('a'+(nibble-10))));
+		}
+		return stringBuilder.toString();
+	}
+	
 }

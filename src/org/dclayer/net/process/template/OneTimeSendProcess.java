@@ -1,7 +1,7 @@
 package org.dclayer.net.process.template;
 
 import org.dclayer.net.RevisionMessage;
-import org.dclayer.net.addresscache.CachedServiceAddress;
+import org.dclayer.net.llacache.CachedServiceAddress;
 
 /**
  * base class for one-time service-to-service message send {@link Process}es
