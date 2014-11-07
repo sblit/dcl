@@ -112,7 +112,7 @@ public class InetSocketLLA extends LLA {
 		
 		this.data = new Data(bytes);
 		
-		int port = ((bytes[bytes.length-2] << 8) | bytes[bytes.length-1]);
+		int port = (((bytes[bytes.length-2] & 0xFF) << 8) | (bytes[bytes.length-1] & 0xFF));
 		try {
 			this.inetSocketAddress = new InetSocketAddress(InetAddress.getByAddress(addr), port);
 		} catch (UnknownHostException e) {
