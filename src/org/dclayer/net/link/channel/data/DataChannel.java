@@ -59,7 +59,7 @@ public abstract class DataChannel extends Channel implements ListenerByteBufInte
 	/**
 	 * {@link DiscontinuousBlockCollection} of received packets
 	 */
-	private DiscontinuousBlockCollection receivedDiscontinuousBlockCollection = new DiscontinuousBlockCollection(1024);
+	private DiscontinuousBlockCollection receivedDiscontinuousBlockCollection = new DiscontinuousBlockCollection(this, 1024);
 	
 	/**
 	 * {@link TransparentByteBuf} for inbound packet bodies

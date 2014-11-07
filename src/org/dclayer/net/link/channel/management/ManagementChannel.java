@@ -53,7 +53,7 @@ public abstract class ManagementChannel extends Channel {
 	/**
 	 * {@link DiscontinuousBlockCollection} of received packets
 	 */
-	private DiscontinuousBlockCollection receivedDiscontinuousBlockCollection = new DiscontinuousBlockCollection(1024);
+	private DiscontinuousBlockCollection receivedDiscontinuousBlockCollection = new DiscontinuousBlockCollection(this, 1024);
 	
 	/**
 	 * {@link TransparentByteBuf} for inbound packet bodies
@@ -132,7 +132,7 @@ public abstract class ManagementChannel extends Channel {
 				} else {
 					// declare this packet as failed to send
 					// TODO
-					Log.debug(ManagementChannel.this, "FAILED TO TRANSMIT PACKET %s", packetBackup);
+					Log.warning(ManagementChannel.this, "FAILED TO TRANSMIT PACKET %s", packetBackup);
 				}
 			}
 		}
@@ -256,7 +256,7 @@ public abstract class ManagementChannel extends Channel {
 				
 			} else {
 				
-				Log.debug(this, "received a dataId (%d) below this channel's dataIdRead (%d) and found no linked reply (discontinuousBlock=%s), ignoring", dataId, dataIdRead, block);
+				Log.msg(this, "received a dataId (%d) below this channel's dataIdRead (%d) and found no linked reply (discontinuousBlock=%s), ignoring", dataId, dataIdRead, block);
 				
 			}
 

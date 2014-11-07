@@ -176,7 +176,7 @@ public class Link<T> implements HierarchicalLevel {
 	 */
 	public void setStatus(Status status) {
 		Status oldStatus = this.status;
-		Log.debug(this, "setting status from %s to %s", this.status, status);
+		Log.msg(this, "setting status from %s to %s", this.status, status);
 		this.status = status;
 		onLinkActionListener.onLinkStatusChange(referenceObject, oldStatus, status);
 	}
@@ -311,12 +311,12 @@ public class Link<T> implements HierarchicalLevel {
 		if(channel != null) {
 			Log.debug(this, "dataId %d: calling channel.receiveLinkPacketBody()", dataId);
 			if(!channel.isOpen()) {
-				Log.debug(this, "channel %s is not open, opening...", channel);
+				Log.msg(this, "channel %s is not open, opening...", channel);
 				channel.open(true);
 			}
 			channel.receiveLinkPacketBody(dataId, channelId, byteBuf, length);
 		} else {
-			Log.debug(this, "dataId %d: no channel with channelId %d, ignoring", dataId, channelId);
+			Log.msg(this, "dataId %d: no channel with channelId %d, ignoring", dataId, channelId);
 		}
 			
 	}
@@ -596,13 +596,13 @@ public class Link<T> implements HierarchicalLevel {
 		
 		if(channel != null) {
 			
-			Log.debug(this, "opening new channel: channelId %d, protocol: %s", channelId, protocol);
+			Log.msg(this, "opening new channel: channelId %d, protocol: %s", channelId, protocol);
 			putChannel(channel);
 			managementChannel.requestOpenChannel(channelId, protocol);
 			
 		} else {
 			
-			Log.debug(this, "can't open new channel for protocol: %s", protocol);
+			Log.msg(this, "can't open new channel for protocol: %s", protocol);
 			
 		}
 		

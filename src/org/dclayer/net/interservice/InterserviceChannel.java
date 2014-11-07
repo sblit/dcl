@@ -147,12 +147,12 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	}
 	
 	private void setVersion(long version) {
-		Log.debug(this, "setting version from %d to %d", this.version, version);
+		Log.msg(this, "setting version from %d to %d", this.version, version);
 		this.version = version;
 	}
 	
 	private void setReady() {
-		Log.debug(this, "InterserviceChannel ready%s, version %d", this.ready ? " (was ready before)" : "", this.version);
+		Log.msg(this, "InterserviceChannel ready%s, version %d", this.ready ? " (was ready before)" : "", this.version);
 		if(this.ready) return;
 		this.ready = true;
 		this.interserviceChannelActionListener.onReadyChange(this, ready);
@@ -168,7 +168,7 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	}
 	
 	private void setInConnectionBase(byte inConnectionBase) {
-		Log.debug(this, "setting incoming connection base from %d to %d", this.inConnectionBase, inConnectionBase);
+		Log.msg(this, "setting incoming connection base from %d to %d", this.inConnectionBase, inConnectionBase);
 		byte oldInConnectionBase = this.inConnectionBase;
 		this.inConnectionBase = inConnectionBase;
 		if(oldInConnectionBase != inConnectionBase) {
@@ -182,11 +182,11 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	 */
 	private void setOutConnectionBase(byte outConnectionBase) {
 		byte oldOutConnectionBase = this.outConnectionBase;
-		Log.debug(this, "setting outgoing connection base from %d to %d", oldOutConnectionBase, outConnectionBase);
+		Log.msg(this, "setting outgoing connection base from %d to %d", oldOutConnectionBase, outConnectionBase);
 		this.outConnectionBase = outConnectionBase;
 		
 		if(outConnectionBase > this.maxAllowedOutConnectionBase) {
-			Log.debug(this, "limiting new outgoing connection base %d down to maximum allowed outgoing connection base %d", outConnectionBase, this.maxAllowedOutConnectionBase);
+			Log.msg(this, "limiting new outgoing connection base %d down to maximum allowed outgoing connection base %d", outConnectionBase, this.maxAllowedOutConnectionBase);
 			outConnectionBase = this.maxAllowedOutConnectionBase;
 		}
 		
@@ -196,8 +196,8 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	}
 	
 	private synchronized void sendInitialNetworkJoinNotices() {
-		Log.debug(this, "sending initial network join notices ...");
 		NetworkType[] networkTypes = this.localAPBRAddress.getNetworkTypeCollection().copyArray();
+		Log.msg(this, "sending initial network join notices (%d)", networkTypes.length);
 		for(NetworkType networkType : networkTypes) {
 			int slot = localNetworkSlotMap.add(networkType);
 			sendNetworkJoinNotice(networkType, slot);
@@ -207,7 +207,7 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	private void setTrustedRemoteAddress(Key publicKey) {
 		// TODO type safety
 		APBRAddress address = new APBRAddress(KeyPair.fromPublicKey(publicKey));
-		Log.debug(this, "setting trusted remote address: %s", address);
+		Log.msg(this, "setting trusted remote address: %s", address);
 		this.trustedRemoteAddress = address;
 	}
 	
@@ -435,7 +435,7 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 		Log.debug(this, "received trusted switch");
 		
 		if(trustedSwitchOutCryptoChallenge != null) {
-			Log.debug(this, "ignoring trusted switch, already challenging the remote");
+			Log.msg(this, "ignoring trusted switch, already challenging the remote");
 			// TODO notify remote of failure
 			return;
 		}
@@ -462,7 +462,7 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 		Log.debug(this, "received crypto challenge request");
 		
 		if(action != ACTION_TRUSTED_SWITCH) {
-			Log.debug(this, "ignoring crypto challenge request, not performing trusted switch");
+			Log.msg(this, "ignoring crypto challenge request, not performing trusted switch");
 			// didn't request this
 			return;
 		}
@@ -488,7 +488,7 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 		Log.debug(this, "received crypto challenge reply");
 		
 		if(trustedSwitchOutCryptoChallenge == null) {
-			Log.debug(this, "ignoring crypto challenge reply, didn't challenge the remote");
+			Log.msg(this, "ignoring crypto challenge reply, didn't challenge the remote");
 			// didn't see a trusted switch message before
 			return;
 		}
@@ -527,10 +527,10 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 		
 		NetworkType networkType = networkJoinNoticeInterserviceMessage.getNetworkType();
 		int slot = networkJoinNoticeInterserviceMessage.getSlot();
-		Log.debug(this, "received network join notice for network: %s", networkType);
+		Log.msg(this, "received network join notice for network: %s", networkType);
 		
 		if(inConnectionBase < CONNECTIONBASE_TRUSTED) {
-			Log.debug(this, "ignoring network join notice, incoming connection base insufficient");
+			Log.msg(this, "ignoring network join notice, incoming connection base insufficient");
 			return;
 		}
 		
@@ -544,7 +544,7 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 		Log.debug(this, "received network leave notice for slot: %d", slot);
 		
 		if(inConnectionBase < CONNECTIONBASE_TRUSTED) {
-			Log.debug(this, "ignoring network leave notice, incoming connection base insufficient");
+			Log.msg(this, "ignoring network leave notice, incoming connection base insufficient");
 			return;
 		}
 		
@@ -571,7 +571,7 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	public void onReceiveNetworkPacketInterserviceMessage(NetworkPacketInterserviceMessage networkPacketInterserviceMessage) {
 		
 		if(inConnectionBase < CONNECTIONBASE_MEMBER) {
-			Log.debug(this, "ignoring network packet, incoming connection base insufficient");
+			Log.msg(this, "ignoring network packet, incoming connection base insufficient");
 			return;
 		}
 		

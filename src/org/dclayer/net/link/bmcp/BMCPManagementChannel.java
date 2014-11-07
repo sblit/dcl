@@ -200,9 +200,9 @@ public class BMCPManagementChannel extends ManagementChannel {
 	// no synchronization needed, this is called from process() which is already synchronized
 	public void onReceiveConnectCrypto(DiscontinuousBlock discontinuousBlock, long dataId, ConnectCryptoBMCPCommandComponent connectCryptoBMCPCommandComponent) {
 		
-		Log.debug(this, "onReceiveConnect, link status: %s", getLink().getStatus());
+		Log.msg(this, "onReceiveConnect, link status: %s", getLink().getStatus());
 		if(getLink().getStatus() != Link.Status.None) {
-			Log.debug(this, "ignoring connect request, link status != %s", Link.Status.None);
+			Log.msg(this, "ignoring connect request, link status != %s", Link.Status.None);
 			return;
 		}
 		
@@ -262,9 +262,9 @@ public class BMCPManagementChannel extends ManagementChannel {
 	// no synchronization needed, this is called from process() which is already synchronized
 	public void onReceiveConnectCryptoEchoReq(DiscontinuousBlock discontinuousBlock, long dataId, ConnectCryptoEchoReqBMCPCommandComponent connectCryptoEchoReqBMCPCommandComponent) {
 		
-		Log.debug(this, "onReceiveConnectCryptoEchoReq, link status: %s", getLink().getStatus());
+		Log.msg(this, "onReceiveConnectCryptoEchoReq, link status: %s", getLink().getStatus());
 		if(getLink().getStatus() != Link.Status.ConnectingActiveConnectRequested) {
-			Log.debug(this, "ignoring connect echo request, link status != %s", Link.Status.ConnectingActiveConnectRequested);
+			Log.msg(this, "ignoring connect echo request, link status != %s", Link.Status.ConnectingActiveConnectRequested);
 			return;
 		}
 		
@@ -311,9 +311,9 @@ public class BMCPManagementChannel extends ManagementChannel {
 	// no synchronization needed, this is called from process() which is already synchronized
 	public void onReceiveConnectEchoReply(DiscontinuousBlock discontinuousBlock, long dataId, ConnectEchoReplyBMCPCommandComponent connectEchoReplyBMCPCommandComponent) {
 		
-		Log.debug(this, "onReceiveConnectEchoReply, link status: %s", getLink().getStatus());
+		Log.msg(this, "onReceiveConnectEchoReply, link status: %s", getLink().getStatus());
 		if(getLink().getStatus() != Link.Status.ConnectingPassiveEchoRequested) {
-			Log.debug(this, "ignoring connect echo reply, link status != %s", Link.Status.ConnectingPassiveEchoRequested);
+			Log.msg(this, "ignoring connect echo reply, link status != %s", Link.Status.ConnectingPassiveEchoRequested);
 			return;
 		}
 		
@@ -337,9 +337,9 @@ public class BMCPManagementChannel extends ManagementChannel {
 	// no synchronization needed, this is called from process() which is already synchronized
 	public void onReceiveFullEncryptionRequest(DiscontinuousBlock discontinuousBlock, long dataId, ConnectFullEncryptionReqBMCPCommandComponent connectFullEncryptionReqBMCPCommandComponent) {
 		
-		Log.debug(this, "onReceiveFullEncryptionRequest, link status: %s", getLink().getStatus());
+		Log.msg(this, "onReceiveFullEncryptionRequest, link status: %s", getLink().getStatus());
 		if(getLink().getStatus() != Link.Status.ConnectingActiveEchoReplied) {
-			Log.debug(this, "ignoring full encryption request, link status != %s", Link.Status.ConnectingActiveEchoReplied);
+			Log.msg(this, "ignoring full encryption request, link status != %s", Link.Status.ConnectingActiveEchoReplied);
 			return;
 		}
 		
@@ -363,9 +363,9 @@ public class BMCPManagementChannel extends ManagementChannel {
 	// no synchronization needed, this is called from process() which is already synchronized
 	public void onReceiveConnectConfirmation(DiscontinuousBlock discontinuousBlock, long dataId, ConnectConfirmationBMCPCommandComponent connectConfirmationBMCPCommandComponent) {
 		
-		Log.debug(this, "onReceiveConnectConfirmation, link status: %s", getLink().getStatus());
+		Log.msg(this, "onReceiveConnectConfirmation, link status: %s", getLink().getStatus());
 		if(getLink().getStatus() != Link.Status.ConnectingPassiveFullEncryptionRequested) {
-			Log.debug(this, "ignoring connect echo request, link status != %s", Link.Status.ConnectingPassiveFullEncryptionRequested);
+			Log.msg(this, "ignoring connect echo request, link status != %s", Link.Status.ConnectingPassiveFullEncryptionRequested);
 			return;
 		}
 		
@@ -510,7 +510,7 @@ public class BMCPManagementChannel extends ManagementChannel {
 				}
 			}
 			
-			System.out.println(String.format("CHANNEL %d: CAN (clear=%s) CLEAR UP TO DATAID %d", channelId, clear, clearUpTo));
+			Log.debug(this, "CHANNEL %d: CAN (clear=%s) CLEAR UP TO DATAID %d", channelId, clear, clearUpTo);
 			
 			if(clear) {
 				packetBackupCollection.clearUpTo(clearUpTo);
@@ -539,18 +539,18 @@ public class BMCPManagementChannel extends ManagementChannel {
 		long channelId = openChannelRequestBMCPCommandComponent.getChannelId();
 		String protocol = openChannelRequestBMCPCommandComponent.getProtocol();
 		
-		Log.debug(this, "peer wants to open channelId %d with protocol: %s", channelId, protocol);
+		Log.msg(this, "peer wants to open channelId %d with protocol: %s", channelId, protocol);
 		
 		if(getLink().onOpenChannelRequest(channelId, protocol)) {
 			
 			// channel can be opened
-			Log.debug(this, "confirming open channel request for channelId %d with protocol: %s", channelId, protocol);
+			Log.msg(this, "confirming open channel request for channelId %d with protocol: %s", channelId, protocol);
 			sendOpenChannelConfirmation(channelId, protocol, dataId, discontinuousBlock);
 			
 		} else {
 			
 			// channel can not be opened
-			Log.debug(this, "open channel request ignored for channelId %d with protocol: %s", channelId, protocol);
+			Log.msg(this, "ignoring open channel request for channelId %d with protocol: %s", channelId, protocol);
 			
 		}
 		
@@ -577,12 +577,12 @@ public class BMCPManagementChannel extends ManagementChannel {
 		
 		Channel channel = getLink().getChannelCollection().get(channelId);
 		
-		Log.debug(this, "opening of channel id %d (%s) confirmed", channelId, channel);
+		Log.msg(this, "opening of channel id %d (%s) confirmed", channelId, channel);
 		
 		if(channel != null) {
 			
 			if(channel.isOpen()) {
-				Log.debug(this, "channel %s is already open", channel);
+				Log.msg(this, "channel %s is already open", channel);
 			} else {
 				channel.open(true);
 			}

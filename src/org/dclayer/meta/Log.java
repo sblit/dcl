@@ -7,15 +7,38 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.LinkedList;
 
+import org.dclayer.net.link.Link;
+import org.dclayer.net.link.channel.Channel;
+import org.dclayer.net.link.control.FlowControl;
+import org.dclayer.net.link.control.ResendPacketQueue;
+import org.dclayer.net.link.control.discontinuousblock.DiscontinuousBlockCollection;
+import org.dclayer.net.link.control.packetbackup.PacketBackupCollection;
+import org.dclayer.net.socket.UDPSocket;
+
 /**
  * logging class used for message output
  */
 public class Log {
 	
-	public static final Class[][] IGNORE = new Class[][] {
+	private static class IgnoreEntry {
+		Level belowLevel;
+		Class[] reversePath;
+		public IgnoreEntry(Level belowLevel, Class... reversePath) {
+			this.belowLevel = belowLevel;
+			this.reversePath = reversePath;
+		}
+	}
+	
+	public static final IgnoreEntry[] IGNORE = new IgnoreEntry[] {
 		// specify reserved paths here (e.g. { InterserviceChannel.class, DCLService.class, DCL.class })
 		// if the end of a log message's path matches one of the arrays below reserved, the message is not printed
-//		new Class[] {  },
+		new IgnoreEntry(Level.WARNING, UDPSocket.class),
+		new IgnoreEntry(Level.WARNING, FlowControl.class),
+		new IgnoreEntry(Level.WARNING, ResendPacketQueue.class),
+		new IgnoreEntry(Level.WARNING, PacketBackupCollection.class),
+		new IgnoreEntry(Level.WARNING, DiscontinuousBlockCollection.class),
+		new IgnoreEntry(Level.MSG, Channel.class),
+		new IgnoreEntry(Level.MSG, Link.class),
 	};
 	
 	public static String PART_MAIN = "main",
@@ -187,12 +210,13 @@ public class Log {
 		return stringBuilder.toString();
 	}
 	
-	private static boolean ignore(HierarchicalLevel hierarchicalLevel) {
-		paths: for(Class[] reversePath : IGNORE) {
-			HierarchicalLevel l = hierarchicalLevel;
-			for(Class c : reversePath) {
-				if(l == null || c != l.getClass()) continue paths;
-				l = l.getParentHierarchicalLevel();
+	private static boolean ignore(Level l, HierarchicalLevel hierarchicalLevel) {
+		paths: for(IgnoreEntry ignoreEntry : IGNORE) {
+			if(l.ordinal() >= ignoreEntry.belowLevel.ordinal()) continue;
+			HierarchicalLevel hl = hierarchicalLevel;
+			for(Class c : ignoreEntry.reversePath) {
+				if(hl == null || !c.isAssignableFrom(hl.getClass())) continue paths;
+				hl = hl.getParentHierarchicalLevel();
 			}
 			return true;
 		}
@@ -200,7 +224,7 @@ public class Log {
 	}
 	
 	private static void log(Level l, HierarchicalLevel hierarchicalLevel, String format, Object... args) {
-		if(ignore(hierarchicalLevel)) return;
+		if(ignore(l, hierarchicalLevel)) return;
 		println(String.format("%s [%s] %s: %s",
 				DATE_FORMAT.format(Calendar.getInstance().getTime()),
 				l.name(),
@@ -219,6 +243,10 @@ public class Log {
 	
 	public static void debug(HierarchicalLevel hierarchicalLevel, String format, Object... args) {
 		log(Level.DEBUG, hierarchicalLevel, format, args);
+	}
+	
+	public static void msg(HierarchicalLevel hierarchicalLevel, String format, Object... args) {
+		log(Level.MSG, hierarchicalLevel, format, args);
 	}
 	
 	public static void warning(HierarchicalLevel hierarchicalLevel, String format, Object... args) {
