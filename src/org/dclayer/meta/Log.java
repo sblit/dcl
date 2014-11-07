@@ -15,7 +15,7 @@ public class Log {
 	public static final Class[][] IGNORE = new Class[][] {
 		// specify reserved paths here (e.g. { InterserviceChannel.class, DCLService.class, DCL.class })
 		// if the end of a log message's path matches one of the arrays below reserved, the message is not printed
-		new Class[] {  },
+//		new Class[] {  },
 	};
 	
 	public static String PART_MAIN = "main",
