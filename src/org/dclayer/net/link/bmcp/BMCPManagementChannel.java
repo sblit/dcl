@@ -9,6 +9,7 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.component.FlexNum;
 import org.dclayer.net.link.Link;
 import org.dclayer.net.link.bmcp.component.AckBMCPCommandComponent;
@@ -31,7 +32,6 @@ import org.dclayer.net.link.bmcp.crypto.component.CryptoDataComponent;
 import org.dclayer.net.link.channel.Channel;
 import org.dclayer.net.link.channel.ChannelCollection;
 import org.dclayer.net.link.channel.management.ManagementChannel;
-import org.dclayer.net.link.component.DataComponent;
 import org.dclayer.net.link.control.discontinuousblock.DiscontinuousBlock;
 import org.dclayer.net.link.control.idcollection.IdBoundary;
 import org.dclayer.net.link.control.idcollection.IdCollection;
@@ -120,8 +120,9 @@ public class BMCPManagementChannel extends ManagementChannel {
 	}
 	
 	@Override
-	public void startChannel() {
+	public void onOpenChannel(boolean initiator) {
 		blockStatusThread.start();
+		if(initiator) connect();
 	}
 	
 	// locks receiveLock (theoretically, as long as ManegementChannel synchronizes calls to its read() function, no synchronization is needed here)
@@ -199,9 +200,9 @@ public class BMCPManagementChannel extends ManagementChannel {
 	// no synchronization needed, this is called from process() which is already synchronized
 	public void onReceiveConnectCrypto(DiscontinuousBlock discontinuousBlock, long dataId, ConnectCryptoBMCPCommandComponent connectCryptoBMCPCommandComponent) {
 		
-		Log.debug(this, "onReceiveConnect, link status: %s", getLink().getStatus());
+		Log.msg(this, "onReceiveConnect, link status: %s", getLink().getStatus());
 		if(getLink().getStatus() != Link.Status.None) {
-			Log.debug(this, "ignoring connect request, link status != %s", Link.Status.None);
+			Log.msg(this, "ignoring connect request, link status != %s", Link.Status.None);
 			return;
 		}
 		
@@ -261,9 +262,9 @@ public class BMCPManagementChannel extends ManagementChannel {
 	// no synchronization needed, this is called from process() which is already synchronized
 	public void onReceiveConnectCryptoEchoReq(DiscontinuousBlock discontinuousBlock, long dataId, ConnectCryptoEchoReqBMCPCommandComponent connectCryptoEchoReqBMCPCommandComponent) {
 		
-		Log.debug(this, "onReceiveConnectCryptoEchoReq, link status: %s", getLink().getStatus());
+		Log.msg(this, "onReceiveConnectCryptoEchoReq, link status: %s", getLink().getStatus());
 		if(getLink().getStatus() != Link.Status.ConnectingActiveConnectRequested) {
-			Log.debug(this, "ignoring connect echo request, link status != %s", Link.Status.ConnectingActiveConnectRequested);
+			Log.msg(this, "ignoring connect echo request, link status != %s", Link.Status.ConnectingActiveConnectRequested);
 			return;
 		}
 		
@@ -310,9 +311,9 @@ public class BMCPManagementChannel extends ManagementChannel {
 	// no synchronization needed, this is called from process() which is already synchronized
 	public void onReceiveConnectEchoReply(DiscontinuousBlock discontinuousBlock, long dataId, ConnectEchoReplyBMCPCommandComponent connectEchoReplyBMCPCommandComponent) {
 		
-		Log.debug(this, "onReceiveConnectEchoReply, link status: %s", getLink().getStatus());
+		Log.msg(this, "onReceiveConnectEchoReply, link status: %s", getLink().getStatus());
 		if(getLink().getStatus() != Link.Status.ConnectingPassiveEchoRequested) {
-			Log.debug(this, "ignoring connect echo reply, link status != %s", Link.Status.ConnectingPassiveEchoRequested);
+			Log.msg(this, "ignoring connect echo reply, link status != %s", Link.Status.ConnectingPassiveEchoRequested);
 			return;
 		}
 		
@@ -336,20 +337,20 @@ public class BMCPManagementChannel extends ManagementChannel {
 	// no synchronization needed, this is called from process() which is already synchronized
 	public void onReceiveFullEncryptionRequest(DiscontinuousBlock discontinuousBlock, long dataId, ConnectFullEncryptionReqBMCPCommandComponent connectFullEncryptionReqBMCPCommandComponent) {
 		
-		Log.debug(this, "onReceiveFullEncryptionRequest, link status: %s", getLink().getStatus());
+		Log.msg(this, "onReceiveFullEncryptionRequest, link status: %s", getLink().getStatus());
 		if(getLink().getStatus() != Link.Status.ConnectingActiveEchoReplied) {
-			Log.debug(this, "ignoring full encryption request, link status != %s", Link.Status.ConnectingActiveEchoReplied);
+			Log.msg(this, "ignoring full encryption request, link status != %s", Link.Status.ConnectingActiveEchoReplied);
 			return;
 		}
 		
 		// remove the ConnectEchoReply packet that is currently being actively resent from the sent-PacketBackupCollection
 		clear(currentPendingDataId, 0);
 		
-		getLink().setStatus(Link.Status.Connected);
-		
 		getLink().applyNewOutHeaderTransparentByteBuf();
 		
 		sendConnectConfirmation(discontinuousBlock);
+		
+		getLink().setStatus(Link.Status.Connected);
 		
 	}
 	
@@ -362,9 +363,9 @@ public class BMCPManagementChannel extends ManagementChannel {
 	// no synchronization needed, this is called from process() which is already synchronized
 	public void onReceiveConnectConfirmation(DiscontinuousBlock discontinuousBlock, long dataId, ConnectConfirmationBMCPCommandComponent connectConfirmationBMCPCommandComponent) {
 		
-		Log.debug(this, "onReceiveConnectConfirmation, link status: %s", getLink().getStatus());
+		Log.msg(this, "onReceiveConnectConfirmation, link status: %s", getLink().getStatus());
 		if(getLink().getStatus() != Link.Status.ConnectingPassiveFullEncryptionRequested) {
-			Log.debug(this, "ignoring connect echo request, link status != %s", Link.Status.ConnectingPassiveFullEncryptionRequested);
+			Log.msg(this, "ignoring connect echo request, link status != %s", Link.Status.ConnectingPassiveFullEncryptionRequested);
 			return;
 		}
 		
@@ -509,7 +510,7 @@ public class BMCPManagementChannel extends ManagementChannel {
 				}
 			}
 			
-			System.out.println(String.format("CHANNEL %d: CAN (clear=%s) CLEAR UP TO DATAID %d", channelId, clear, clearUpTo));
+			Log.debug(this, "CHANNEL %d: CAN (clear=%s) CLEAR UP TO DATAID %d", channelId, clear, clearUpTo);
 			
 			if(clear) {
 				packetBackupCollection.clearUpTo(clearUpTo);
@@ -538,18 +539,18 @@ public class BMCPManagementChannel extends ManagementChannel {
 		long channelId = openChannelRequestBMCPCommandComponent.getChannelId();
 		String protocol = openChannelRequestBMCPCommandComponent.getProtocol();
 		
-		Log.debug(this, "peer wants to open channelId %d with protocol: %s", channelId, protocol);
+		Log.msg(this, "peer wants to open channelId %d with protocol: %s", channelId, protocol);
 		
 		if(getLink().onOpenChannelRequest(channelId, protocol)) {
 			
 			// channel can be opened
-			Log.debug(this, "confirming open channel request for channelId %d with protocol: %s", channelId, protocol);
+			Log.msg(this, "confirming open channel request for channelId %d with protocol: %s", channelId, protocol);
 			sendOpenChannelConfirmation(channelId, protocol, dataId, discontinuousBlock);
 			
 		} else {
 			
 			// channel can not be opened
-			Log.debug(this, "open channel request ignored for channelId %d with protocol: %s", channelId, protocol);
+			Log.msg(this, "ignoring open channel request for channelId %d with protocol: %s", channelId, protocol);
 			
 		}
 		
@@ -572,8 +573,22 @@ public class BMCPManagementChannel extends ManagementChannel {
 		
 		// TODO check if we really requested a new channel
 		
-		Log.debug(this, "channel open confirmed!");
+		long channelId = openChannelConfirmationBMCPCommandComponent.getChannelId();
 		
+		Channel channel = getLink().getChannelCollection().get(channelId);
+		
+		Log.msg(this, "opening of channel id %d (%s) confirmed", channelId, channel);
+		
+		if(channel != null) {
+			
+			if(channel.isOpen()) {
+				Log.msg(this, "channel %s is already open", channel);
+			} else {
+				channel.open(true);
+			}
+			
+		}
+
 		clear(openChannelConfirmationBMCPCommandComponent.getAckDataId(), 0);
 		
 	}
@@ -652,9 +667,8 @@ public class BMCPManagementChannel extends ManagementChannel {
 	/**
 	 * starts this {@link BMCPManagementChannel} and connects to the peer
 	 */
-	public void connect() {
+	private void connect() {
 		
-		start();
 		sendConnect();
 		
 	}

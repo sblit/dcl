@@ -60,11 +60,6 @@ public class FlowControl extends Thread implements HierarchicalLevel {
 	 */
 	private Link link;
 	
-	/**
-	 * The {@link LinkSendInterface} for sending {@link PacketBackup}s
-	 */
-	private LinkSendInterface linkSendInterface;
-	
 	@Override
 	public String toString() {
 		return "FlowControl";
@@ -79,9 +74,8 @@ public class FlowControl extends Thread implements HierarchicalLevel {
 	 * Creates a new {@link FlowControl} instance, sending {@link PacketBackup}s over the given {@link LinkSendInterface}
 	 * @param linkSendInterface the {@link LinkSendInterface} for sending {@link PacketBackup}s
 	 */
-	public FlowControl(Link link, LinkSendInterface linkSendInterface) {
+	public FlowControl(Link link) {
 		this.link = link;
-		this.linkSendInterface = linkSendInterface;
 		this.start();
 	}
 	
@@ -158,7 +152,7 @@ public class FlowControl extends Thread implements HierarchicalLevel {
 	 */
 	private int sendPacketBackup(PacketBackup packetBackup) {
 		Data data = packetBackup.getPacketProperties().data;
-		linkSendInterface.sendLinkPacket(link, data);
+		link.transmitNow(data);
 		packetBackup.onSent();
 		synchronized(packetBackup.getFlowControlProperties()) {
 			packetBackup.getFlowControlProperties().queued = false;

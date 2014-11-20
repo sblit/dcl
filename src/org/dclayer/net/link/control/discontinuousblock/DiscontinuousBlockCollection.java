@@ -1,12 +1,16 @@
 package org.dclayer.net.link.control.discontinuousblock;
 import org.dclayer.exception.net.buf.BufException;
+import org.dclayer.meta.HierarchicalLevel;
+import org.dclayer.meta.Log;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.link.control.packetbackup.PacketBackupCollection;
 
 /**
  * the {@link DiscontinuousBlock}-storing counterpart to the {@link PacketBackupCollection}
  */
-public class DiscontinuousBlockCollection {
+public class DiscontinuousBlockCollection implements HierarchicalLevel {
+	
+	private HierarchicalLevel parentHierarchicalLevel;
 	
 	/**
 	 * array containing all available {@link DiscontinuousBlock} instances
@@ -30,7 +34,8 @@ public class DiscontinuousBlockCollection {
 	 */
 	private int numUsed = 0;
 	
-	public DiscontinuousBlockCollection(int size) {
+	public DiscontinuousBlockCollection(HierarchicalLevel parentHierarchicalLevel, int size) {
+		this.parentHierarchicalLevel = parentHierarchicalLevel;
 		this.blocks = new DiscontinuousBlock[size];
 	}
 	
@@ -232,13 +237,18 @@ public class DiscontinuousBlockCollection {
 	 */
 	public synchronized DiscontinuousBlock get(long dataId) {
 		int index = getIndex(dataId, false);
-		System.out.println(String.format("DiscontinuousBlockCollection.get(dataId %d): index=%d, block=%s", dataId, index, blocks[index]));
+		Log.debug(this, "get(dataId %d): index=%d, block=%s", dataId, index, blocks[index]);
 		return (blocks[index] != null && blocks[index].used) ? blocks[index] : null;
 	}
 	
 	@Override
 	public String toString() {
 		return String.format("DiscontinuousBlockCollection(%d/%d blocks, dataIdOffset=%d, startIndex=%d)", numUsed, blocks.length, dataIdOffset, startIndex);
+	}
+
+	@Override
+	public HierarchicalLevel getParentHierarchicalLevel() {
+		return parentHierarchicalLevel;
 	}
 	
 }

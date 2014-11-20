@@ -4,7 +4,8 @@ import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.exception.net.parse.UnsupportedMessageTypeException;
 import org.dclayer.net.PacketComponent;
-import org.dclayer.net.RevisionMessage;
+import org.dclayer.net.a2s.A2SRevisionMessage;
+import org.dclayer.net.a2s.ApplicationConnection;
 import org.dclayer.net.a2s.rev0.message.BindMessage;
 import org.dclayer.net.a2s.rev0.message.DataMessage;
 import org.dclayer.net.a2s.rev0.message.KnownAddressesReplyMessage;
@@ -15,7 +16,7 @@ import org.dclayer.net.buf.ByteBuf;
 /**
  * a message of revision 0
  */
-public class Message extends RevisionMessage {
+public class Message extends A2SRevisionMessage {
 	/**
 	 * bind message type, revision 0
 	 */
@@ -41,24 +42,6 @@ public class Message extends RevisionMessage {
 	 * the message of revision 0 this {@link Message} contains
 	 */
 	private Rev0Message message;
-
-	/**
-	 * creates a revision 0 {@link Message} object, reconstructed from the given {@link ByteBuf}
-	 * @param byteBuf the {@link ByteBuf} to reconstruct this revision 0 {@link Message} from
-	 * @throws ParseException thrown if the {@link ByteBuf} can not be parsed
-	 * @throws BufException thrown if an operation on the {@link ByteBuf} fails
-	 */
-	public Message(ByteBuf byteBuf) throws ParseException, BufException {
-		super(byteBuf);
-	}
-	
-	/**
-	 * creates a revision 0 {@link Message} object, reconstructed from the given {@link Rev0Message}
-	 * @param message the {@link Rev0Message} that this revision 0 {@link Message} contains
-	 */
-	public Message(Rev0Message message) {
-		this.message = message;
-	}
 
 	@Override
 	public byte getRevision() {
@@ -133,8 +116,8 @@ public class Message extends RevisionMessage {
 	}
 
 	@Override
-	public int getMessageTypeId() {
-		return message.getType();
+	public void callOnReceiveMethod(ApplicationConnection applicationConnection) {
+		throw new RuntimeException("implement me");
 	}
 
 }

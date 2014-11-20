@@ -106,5 +106,16 @@ public class AsyncPipeByteBuf extends ByteBuf {
 			write(buf[offset + i]);
 		}
 	}
+	
+	/**
+	 * writes the specified amount of bytes from the given {@link ByteBuf} to this {@link AsyncPipeByteBuf}
+	 * @param byteBuf the {@link ByteBuf} to copy bytes from
+	 * @param length the amount of bytes to copy from the given {@link ByteBuf}
+	 */
+	public synchronized void write(ByteBuf byteBuf, int length) throws BufException {
+		for(int i = 0; i < length; i++) {
+			write(byteBuf.read());
+		}
+	}
 
 }

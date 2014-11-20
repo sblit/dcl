@@ -1,5 +1,7 @@
 package org.dclayer.datastructure.tree;
 
+import org.dclayer.net.Data;
+
 /**
  * a tree node with no child nodes
  * @param <T> the type of the value
@@ -9,20 +11,25 @@ public class FinalTreeNode<T> extends TreeNode<T> {
 	/**
 	 * the key for the value
 	 */
-	private long key;
+	private Data key;
 	/**
 	 * the value
 	 */
 	private T value;
 
 	@Override
-	public T get(long key) {
-		return (this.key == key) ? value : null;
+	public T get(Data key) {
+		return this.key.equals(key) ? value : null;
 	}
 
 	@Override
-	public void put(long key, T value) {
-		this.key = key;
+	public T getClosest(Data key, int direction) {
+		return value;
+	}
+
+	@Override
+	public void put(Data key, T value) {
+		this.key = key.copy();
 		this.value = value;
 	}
 
@@ -32,7 +39,7 @@ public class FinalTreeNode<T> extends TreeNode<T> {
 	}
 
 	@Override
-	public long getFinalKey() {
+	public Data getFinalKey() {
 		return key;
 	}
 
@@ -42,7 +49,7 @@ public class FinalTreeNode<T> extends TreeNode<T> {
 	}
 
 	@Override
-	public T remove(long key) {
+	public T remove(Data key) {
 		return null;
 	}
 
@@ -53,7 +60,7 @@ public class FinalTreeNode<T> extends TreeNode<T> {
 
 	@Override
 	public String toString() {
-		return String.format("FinalTreeNode(key=%d, value=%s)", key, value);
+		return String.format("FinalTreeNode(key=%s, value=%s)", key.toString(), value);
 	}
 	
 }

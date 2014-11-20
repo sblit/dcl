@@ -4,7 +4,7 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
-import org.dclayer.net.link.component.DataComponent;
+import org.dclayer.net.component.DataComponent;
 
 /**
  * a simple channel data component containing a {@link DataComponent}

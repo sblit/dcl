@@ -7,10 +7,40 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.LinkedList;
 
+import org.dclayer.net.link.Link;
+import org.dclayer.net.link.channel.Channel;
+import org.dclayer.net.link.control.FlowControl;
+import org.dclayer.net.link.control.ResendPacketQueue;
+import org.dclayer.net.link.control.discontinuousblock.DiscontinuousBlockCollection;
+import org.dclayer.net.link.control.packetbackup.PacketBackupCollection;
+import org.dclayer.net.socket.UDPSocket;
+
 /**
  * logging class used for message output
  */
 public class Log {
+	
+	private static class IgnoreEntry {
+		Level belowLevel;
+		Class[] reversePath;
+		public IgnoreEntry(Level belowLevel, Class... reversePath) {
+			this.belowLevel = belowLevel;
+			this.reversePath = reversePath;
+		}
+	}
+	
+	public static final IgnoreEntry[] IGNORE = new IgnoreEntry[] {
+		// specify reserved paths here (e.g. { InterserviceChannel.class, DCLService.class, DCL.class })
+		// if the end of a log message's path matches one of the arrays below reserved, the message is not printed
+		new IgnoreEntry(Level.WARNING, UDPSocket.class),
+		new IgnoreEntry(Level.WARNING, FlowControl.class),
+		new IgnoreEntry(Level.WARNING, ResendPacketQueue.class),
+		new IgnoreEntry(Level.WARNING, PacketBackupCollection.class),
+		new IgnoreEntry(Level.WARNING, DiscontinuousBlockCollection.class),
+		new IgnoreEntry(Level.MSG, Channel.class),
+		new IgnoreEntry(Level.MSG, Link.class),
+	};
+	
 	public static String PART_MAIN = "main",
 			PART_NET_UDPSOCKET = "net/udpsocket",
 			PART_NET_TCPSOCKET = "net/tcpsocket",
@@ -180,7 +210,21 @@ public class Log {
 		return stringBuilder.toString();
 	}
 	
+	private static boolean ignore(Level l, HierarchicalLevel hierarchicalLevel) {
+		paths: for(IgnoreEntry ignoreEntry : IGNORE) {
+			if(l.ordinal() >= ignoreEntry.belowLevel.ordinal()) continue;
+			HierarchicalLevel hl = hierarchicalLevel;
+			for(Class c : ignoreEntry.reversePath) {
+				if(hl == null || !c.isAssignableFrom(hl.getClass())) continue paths;
+				hl = hl.getParentHierarchicalLevel();
+			}
+			return true;
+		}
+		return false;
+	}
+	
 	private static void log(Level l, HierarchicalLevel hierarchicalLevel, String format, Object... args) {
+		if(ignore(l, hierarchicalLevel)) return;
 		println(String.format("%s [%s] %s: %s",
 				DATE_FORMAT.format(Calendar.getInstance().getTime()),
 				l.name(),
@@ -188,7 +232,37 @@ public class Log {
 				String.format(format, args)));
 	}
 	
+	private static void log(Level l, Object object, String format, Object... args) {
+		println(String.format("%s [%s] (%s %s): %s",
+				DATE_FORMAT.format(Calendar.getInstance().getTime()),
+				l.name(),
+				object.getClass().getCanonicalName(),
+				object.toString(),
+				String.format(format, args)));
+	}
+	
 	public static void debug(HierarchicalLevel hierarchicalLevel, String format, Object... args) {
 		log(Level.DEBUG, hierarchicalLevel, format, args);
 	}
+	
+	public static void msg(HierarchicalLevel hierarchicalLevel, String format, Object... args) {
+		log(Level.MSG, hierarchicalLevel, format, args);
+	}
+	
+	public static void warning(HierarchicalLevel hierarchicalLevel, String format, Object... args) {
+		log(Level.WARNING, hierarchicalLevel, format, args);
+	}
+	
+	public static void exception(HierarchicalLevel hierarchicalLevel, Exception e, String format, Object... args) {
+		log(Level.ERROR, hierarchicalLevel, format + ": %s", args, getStackTraceAsString(e));
+	}
+	
+	public static void exception(HierarchicalLevel hierarchicalLevel, Exception e) {
+		log(Level.ERROR, hierarchicalLevel, "%s", getStackTraceAsString(e));
+	}
+	
+	public static void exception(Object object, Exception e) {
+		log(Level.ERROR, object, "%s", getStackTraceAsString(e));
+	}
+	
 }

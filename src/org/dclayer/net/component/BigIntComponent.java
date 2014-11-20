@@ -20,7 +20,7 @@ public class BigIntComponent extends PacketComponent {
 	/**
 	 * the amount of bytes contained in the {@link BigInteger}
 	 */
-	private FlexNum dataLength;
+	private FlexNum dataLength = new FlexNum();
 	
 	/**
 	 * a buffer for reading the bytes representing the {@link BigInteger}
@@ -43,27 +43,26 @@ public class BigIntComponent extends PacketComponent {
 	}
     
     /**
-     * returns the {@link BigInteger} holding the data contained in this {@link BigIntComponent}
-     * @return the {@link BigInteger} holding the data contained in this {@link BigIntComponent}
+     * @return the {@link BigInteger} holding the data contained in this {@link BigIntComponent}.
+     * the returned object has been newly created while this {@link PacketComponent} was read and can be used without restrictions.
      */
     public BigInteger getBigInteger() {
     	return bigInteger;
     }
     
     /**
-     * sets the {@link BigInteger} for this {@link BigIntComponent} to contain
      * @param bigInteger the {@link BigInteger} for this {@link BigIntComponent} to contain
      */
     public void setBigInteger(BigInteger bigInteger) {
     	this.bigInteger = bigInteger;
     	buf = bigInteger.toByteArray();
+    	dataLength.setNum(buf.length);
     }
 
 	@Override
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
 		dataLength.read(byteBuf);
-		
-		if(buf == null || dataLength.getNum() != buf.length) buf = new byte[(int) dataLength.getNum()];
+		this.buf = new byte[(int) dataLength.getNum()];
 		byteBuf.read(buf);
 		bigInteger = new BigInteger(buf);
 	}

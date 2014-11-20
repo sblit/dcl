@@ -2,6 +2,7 @@ package org.dclayer.net.a2s.rev35;
 
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
+import org.dclayer.net.a2s.ApplicationConnection;
 import org.dclayer.net.buf.ByteBuf;
 
 /**
@@ -31,4 +32,7 @@ public abstract class Rev35Message extends Rev35PacketComponent {
 	 * @return the message type of this {@link Rev35Message}
 	 */
 	public abstract byte getType();
+	
+	public abstract void callOnReceiveMethod(ApplicationConnection applicationConnection);
+	
 }

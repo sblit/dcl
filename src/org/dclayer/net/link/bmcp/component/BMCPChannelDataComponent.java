@@ -102,7 +102,7 @@ public class BMCPChannelDataComponent extends ChannelDataComponent {
 	
 	@Override
 	public String toString() {
-		return String.format("BMCPChannelDataComponent(type=%d)", commandComponent.getType());
+		return String.format("BMCPChannelDataComponent(type=%d)", (commandComponent != null) ? commandComponent.getType() : null);
 	}
 	
 	@Override

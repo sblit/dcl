@@ -4,12 +4,15 @@ import java.io.IOException;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.List;
+import java.util.LinkedList;
 
+import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
-import org.dclayer.net.addresscache.AddressCache;
-import org.dclayer.net.addresscache.CachedServiceAddress;
-import org.dclayer.net.serviceaddress.ServiceAddressIPv4;
+import org.dclayer.net.apbr.APBRNetworkType;
+import org.dclayer.net.circle.CircleNetworkType;
+import org.dclayer.net.llacache.InetSocketLLA;
+import org.dclayer.net.lladatabase.LLADatabase;
+import org.dclayer.net.network.NetworkType;
 
 public class DCL {
 	
@@ -22,15 +25,17 @@ public class DCL {
 	 */
 	public static final String CHANNEL_APPDATA = "org.dclayer.s2s.rev0.appdata";
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws ParseException {
 		
-		final AddressCache addressCache = new AddressCache();
+		final LLADatabase llaDatabase = new LLADatabase();
 		
 		int s2sPort = 1337;
 		int a2sPort = 2000;
 		
+		LinkedList<NetworkType> networkTypes = new LinkedList<>();
+		
 		for(String arg : args) {
-			String[] argParts = arg.split("=");
+			String[] argParts = arg.split("=", 2);
 			if(argParts.length < 2) continue;
 			switch(argParts[0]) {
 			case "s2s": {
@@ -47,11 +52,23 @@ public class DCL {
 				int remotePort = Integer.parseInt(remoteParts[1]);
 				System.out.println(String.format("adding remote: host=%s port=%s", remoteHost, remotePort));
 				try {
-					addressCache.addServiceAddress(new ServiceAddressIPv4((Inet4Address) InetAddress.getByName(remoteHost), remotePort), 0);
+					llaDatabase.store(new InetSocketLLA((Inet4Address) InetAddress.getByName(remoteHost), remotePort));
 				} catch (UnknownHostException e) {
 					e.printStackTrace();
 					return;
 				}
+				break;
+			}
+			case "apbrnet": {
+				APBRNetworkType apbrNetworkType = new APBRNetworkType(argParts[1]);
+				System.out.println(String.format("will join network %s", apbrNetworkType));
+				networkTypes.add(apbrNetworkType);
+				break;
+			}
+			case "circlenet": {
+				CircleNetworkType circleNetworkType = new CircleNetworkType(argParts[1]);
+				System.out.println(String.format("will join network %s", circleNetworkType));
+				networkTypes.add(circleNetworkType);
 				break;
 			}
 			}
@@ -61,22 +78,16 @@ public class DCL {
 		
 		DCLService service;
 		try {
-			service = new DCLService(s2sPort, a2sPort, addressCache);
+			service = new DCLService(s2sPort, a2sPort, llaDatabase);
 		} catch (IOException e) {
 			Log.fatal(Log.PART_MAIN, e);
 			return;
 		}
 		
-		for(;;) {
-			StringBuilder addressDump = new StringBuilder();
-			List<CachedServiceAddress> cachedServiceAddresses = addressCache.get(10, 0, 0, 0);
-			for(CachedServiceAddress cSA : cachedServiceAddresses) {
-				addressDump.append(String.format("\n\t%s", cSA));
-			}
-			Log.debug(Log.PART_MAIN, null, String.format("addresses currently in cache (total %d):%s", addressCache.size(), addressDump.toString()));
-			try { Thread.sleep(5000); }
-			catch (InterruptedException e) { break; }
+		for(NetworkType networkType : networkTypes) {
+			service.join(networkType);
 		}
+		
 	}
 
 }

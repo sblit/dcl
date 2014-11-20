@@ -79,7 +79,7 @@ public class DataByteBuf extends ByteBuf {
 	}
 	
 	/**
-	 * replaces the underlying {@link Data} with the given {@link Data}
+	 * replaces the underlying {@link Data} with the given {@link Data} and resets the current position to the beginning
 	 * @param data the {@link Data} to replace the old underlying {@link Data} with
 	 */
 	public void setData(Data data) {
