@@ -6,11 +6,13 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.LinkedList;
 
-import org.dclayer.apbr.APBRNetworkType;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
+import org.dclayer.net.apbr.APBRNetworkType;
+import org.dclayer.net.circle.CircleNetworkType;
 import org.dclayer.net.llacache.InetSocketLLA;
 import org.dclayer.net.lladatabase.LLADatabase;
+import org.dclayer.net.network.NetworkType;
 
 public class DCL {
 	
@@ -30,7 +32,7 @@ public class DCL {
 		int s2sPort = 1337;
 		int a2sPort = 2000;
 		
-		LinkedList<APBRNetworkType> apbrNetworkTypes = new LinkedList<>();
+		LinkedList<NetworkType> networkTypes = new LinkedList<>();
 		
 		for(String arg : args) {
 			String[] argParts = arg.split("=", 2);
@@ -60,7 +62,13 @@ public class DCL {
 			case "apbrnet": {
 				APBRNetworkType apbrNetworkType = new APBRNetworkType(argParts[1]);
 				System.out.println(String.format("will join network %s", apbrNetworkType));
-				apbrNetworkTypes.add(apbrNetworkType);
+				networkTypes.add(apbrNetworkType);
+				break;
+			}
+			case "circlenet": {
+				CircleNetworkType circleNetworkType = new CircleNetworkType(argParts[1]);
+				System.out.println(String.format("will join network %s", circleNetworkType));
+				networkTypes.add(circleNetworkType);
 				break;
 			}
 			}
@@ -76,8 +84,8 @@ public class DCL {
 			return;
 		}
 		
-		for(APBRNetworkType apbrNetworkType : apbrNetworkTypes) {
-			service.join(apbrNetworkType);
+		for(NetworkType networkType : networkTypes) {
+			service.join(networkType);
 		}
 		
 	}

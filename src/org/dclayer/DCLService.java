@@ -10,14 +10,15 @@ import java.util.List;
 import org.dclayer.PreLinkCommunicationManager.Result;
 import org.dclayer.crypto.Crypto;
 import org.dclayer.crypto.key.KeyPair;
+import org.dclayer.listener.net.NetworkInstanceListener;
 import org.dclayer.listener.net.OnReceiveListener;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
 import org.dclayer.net.a2s.ApplicationConnection;
 import org.dclayer.net.a2s.ApplicationConnectionActionListener;
-import org.dclayer.net.address.APBRAddress;
 import org.dclayer.net.address.Address;
+import org.dclayer.net.address.AsymmetricKeyPairAddress;
 import org.dclayer.net.buf.DataByteBuf;
 import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.interservice.InterserviceChannelActionListener;
@@ -35,11 +36,11 @@ import org.dclayer.net.network.NetworkInstanceCollection;
 import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
-import org.dclayer.net.routing.RoutingTable;
+import org.dclayer.net.network.routing.RoutingTable;
 import org.dclayer.net.socket.TCPSocket;
 import org.dclayer.net.socket.UDPSocket;
 
-public class DCLService implements OnReceiveListener, ApplicationConnectionActionListener, LinkSendInterface<CachedLLA>, OnLinkActionListener<CachedLLA>, InterserviceChannelActionListener, HierarchicalLevel {
+public class DCLService implements OnReceiveListener, NetworkInstanceListener, ApplicationConnectionActionListener, LinkSendInterface<CachedLLA>, OnLinkActionListener<CachedLLA>, InterserviceChannelActionListener, HierarchicalLevel {
 	
 	/**
 	 * local UDPSocket, used for Service-to-Service communication
@@ -53,7 +54,7 @@ public class DCLService implements OnReceiveListener, ApplicationConnectionActio
 	private LLACache llaCache = new LLACache();
 	private LLADatabase llaDatabase;
 	
-	private APBRAddress localAddress;
+	private AsymmetricKeyPairAddress localAddress;
 	
 	private NetworkInstanceCollection networkInstanceCollection = new NetworkInstanceCollection();
 	
@@ -65,35 +66,19 @@ public class DCLService implements OnReceiveListener, ApplicationConnectionActio
 		
 		this.llaDatabase = llaDatabase;
 		
-		Log.debug(this, "generating APBR address RSA keypair...");
-		KeyPair addressKeyPair = Crypto.generateAPBRAddressRSAKeyPair();
+		Log.debug(this, "generating address RSA keypair...");
+		KeyPair addressKeyPair = Crypto.generateAddressRSAKeyPair();
 		Log.debug(this, "done, public key: %s (%d bits)", addressKeyPair.getPublicKey().toString(), addressKeyPair.getPublicKey().getNumBits());
-		this.localAddress = new APBRAddress(addressKeyPair, new NetworkInstanceCollection());
+		this.localAddress = new AsymmetricKeyPairAddress<>(addressKeyPair, new NetworkInstanceCollection());
 		
 		udpSocket = new UDPSocket(this, s2sPort, this);
 		tcpSocket = new TCPSocket(a2sPort, this);
 		
 		this.connectionInitiationManager = new ConnectionInitiationManager(this);
 		
-//		// TODO REMOVE
-//		try {
-//			addressCache.addServiceAddress(new ServiceAddressIPv4((Inet4Address) Inet4Address.getByAddress(new byte[] { 127, 0, 0, 1 }), s2sPort == 1337 ? 2337 : 1337), 0);
-////			addressCache.addServiceAddress(new ServiceAddressIPv4((Inet4Address) Inet4Address.getByAddress(new byte[] { 10, (byte)0, 0, 3 }), 1337), 0);
-//		} catch (UnknownHostException e) {
-//			e.printStackTrace();
-//		}
-		
-//		this.addProcess(new PingReceiveProcess()); // TODO move somewhere more special
-//		this.addProcess(new PingRedirectReceiveProcess());
-//		this.addProcess(new PongRedirectReceiveProcess());
-//		this.addProcess(new KnownAddressesRequestReceiveProcess());
-//		this.addProcess(new PingProcess());
-//		
-//		this.addProcess(new A2SBindReceiveProcess(this, this));
-//		this.addProcess(new A2SKnownAddressesRequestReceiveProcess());
 	}
 	
-	public APBRAddress getServiceAPBRAddress() {
+	public AsymmetricKeyPairAddress getServiceAPBRAddress() {
 		return localAddress;
 	}
 	
@@ -121,10 +106,16 @@ public class DCLService implements OnReceiveListener, ApplicationConnectionActio
 		};
 		
 		localAddress.getNetworkInstanceCollection().addNetworkInstance(networkInstance);
-		networkInstanceCollection.addNetworkInstance(networkInstance);
+		onNetworkInstance(networkInstance);
 		
 		Log.msg(this, "joined network: %s", networkInstance);
 		
+	}
+	
+	@Override
+	public void onNetworkInstance(NetworkInstance networkInstance) {
+		Log.msg(this, "onNetworkInstance: %s", networkInstance);
+		networkInstanceCollection.addNetworkInstance(networkInstance);
 	}
 	
 	@Override

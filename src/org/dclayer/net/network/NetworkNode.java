@@ -5,8 +5,8 @@ import org.dclayer.net.address.Address;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
-import org.dclayer.net.routing.ForwardDestination;
-import org.dclayer.net.routing.RoutingTable;
+import org.dclayer.net.network.routing.ForwardDestination;
+import org.dclayer.net.network.routing.RoutingTable;
 
 public abstract class NetworkNode implements ForwardDestination {
 	
@@ -27,10 +27,12 @@ public abstract class NetworkNode implements ForwardDestination {
 		return networkType;
 	}
 	
+	@Override
 	public Address getAddress() {
 		return address;
 	}
 	
+	@Override
 	public Data getScaledAddress() {
 		return scaledAddress;
 	}

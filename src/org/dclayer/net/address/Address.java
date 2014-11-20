@@ -4,14 +4,14 @@ import org.dclayer.net.Data;
 import org.dclayer.net.network.NetworkInstanceCollection;
 
 /**
- * An DCL node address
+ * A DCL node address
  * @author Martin Exner
  */
 public abstract class Address {
 	
 	private NetworkInstanceCollection networkTypeCollection;
 	
-	private Data hashData = null;
+	private Data data = null;
 	
 	public Address(NetworkInstanceCollection networkTypeCollection) {
 		this.networkTypeCollection = networkTypeCollection;
@@ -21,11 +21,14 @@ public abstract class Address {
 		return networkTypeCollection;
 	}
 	
-	public final Data hashData() {
-		if(hashData == null) hashData = makeHashData();
-		return hashData;
+	public final Data toData() {
+		if(data == null) data = makeData();
+		return data;
 	}
 	
-	protected abstract Data makeHashData();
+	protected abstract Data makeData();
+	
+	@Override
+	public abstract boolean equals(Object o);
 	
 }

@@ -1,7 +1,9 @@
-package org.dclayer.apbr;
+package org.dclayer.net.circle;
 
+import org.dclayer.crypto.hash.HashAlgorithm;
 import org.dclayer.exception.net.parse.MalformedAttributeStringException;
 import org.dclayer.exception.net.parse.ParseException;
+import org.dclayer.exception.net.parse.UnknownHashAlgorithmException;
 import org.dclayer.net.Data;
 import org.dclayer.net.address.Address;
 import org.dclayer.net.network.NetworkInstance;
@@ -9,39 +11,32 @@ import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
+import org.dclayer.net.network.routing.RoutingTable;
 import org.dclayer.net.network.slot.NetworkSlot;
-import org.dclayer.net.routing.ForwardDestination;
-import org.dclayer.net.routing.RoutingTable;
 
 
-public class APBRNetworkType extends NetworkType<APBRNetworkType> {
+public class CircleNetworkType extends NetworkType<CircleNetworkType> {
 	
-	private int numParts = 1;
-	private int partBits = 1;
-	private int bitLength;
+	private HashAlgorithm hashAlgorithm;
 	private int byteLength;
 	
-	public APBRNetworkType(String attributeString) throws ParseException {
-		super(NetworkType.IDENTIFIER_APBR);
+	public CircleNetworkType(String attributeString) throws ParseException {
+		super(NetworkType.IDENTIFIER_CIRCLE);
 		parseAttributeString(attributeString);
-		this.bitLength = this.numParts * this.partBits;
-		this.byteLength = (int) Math.ceil(this.bitLength / 8d);
 	}
 	
-	public <T extends NetworkPacket> APBRNetworkType(int numParts, int partBits) {
+	public <T extends NetworkPacket> CircleNetworkType(HashAlgorithm hashAlgorithm) {
 		super(NetworkType.IDENTIFIER_APBR);
-		this.numParts = numParts;
-		this.partBits = partBits;
-		this.bitLength = this.numParts * this.partBits;
-		this.byteLength = (int) Math.ceil(this.bitLength / 8d);
+		this.hashAlgorithm = hashAlgorithm;
 	}
 	
 	private void parseAttributeString(String attributeString) throws ParseException {
 		String[] attributes = attributeString.split("/");
 		if(attributes.length != 2) throw new MalformedAttributeStringException(this, attributeString);
+		this.hashAlgorithm = HashAlgorithm.byIdentifier(attributes[0]);
+		if(this.hashAlgorithm == null) throw new UnknownHashAlgorithmException(attributes[0]);
 		try {
-			this.numParts = Integer.parseInt(attributes[0]);
-			this.partBits = Integer.parseInt(attributes[1]);
+			this.byteLength = Integer.parseInt(attributes[1]);
 		} catch(NumberFormatException e) {
 			throw new MalformedAttributeStringException(this, attributeString, e);
 		}
@@ -49,15 +44,7 @@ public class APBRNetworkType extends NetworkType<APBRNetworkType> {
 
 	@Override
 	public String getAttributeString() {
-		return String.format("%d/%d", numParts, partBits);
-	}
-	
-	public int getNumParts() {
-		return numParts;
-	}
-	
-	public int getPartBits() {
-		return partBits;
+		return String.format("%s/%d", hashAlgorithm.getIdentifier(), byteLength);
 	}
 
 	@Override
@@ -68,7 +55,9 @@ public class APBRNetworkType extends NetworkType<APBRNetworkType> {
 	@Override
 	public Data scaleAddress(Address address) {
 		
-		Data fullData = address.hashData();
+		Data fullData = address.toData();
+		if(byteLength == hashAlgorithm.getDigestSize()) return fullData;
+		
 		Data scaledData = new Data(byteLength);
 		
 		for(int i = 0; i < fullData.length(); i++) {
@@ -82,32 +71,32 @@ public class APBRNetworkType extends NetworkType<APBRNetworkType> {
 
 	@Override
 	public NetworkPacket makeNetworkPacket(NetworkSlot networkSlot) {
-		return new APBRPacket(networkSlot, this);
+		return new CirclePacket(networkSlot, this);
 	}
 
 	@Override
 	public NetworkPayload makeInNetworkPayload(CommonNetworkPayloadProperties commonNetworkPayloadProperties) {
-		return new APBRNetworkPayload(this, commonNetworkPayloadProperties);
+		return new CircleNetworkPayload(this, commonNetworkPayloadProperties);
 	}
 	
 	@Override
 	public NetworkPayload makeOutNetworkPayload(Data scaledAddressData, CommonNetworkPayloadProperties commonNetworkPayloadProperties) {
-		return new APBRNetworkPayload(this, scaledAddressData, commonNetworkPayloadProperties);
+		return new CircleNetworkPayload(this, scaledAddressData, commonNetworkPayloadProperties);
 	}
 
 	@Override
 	public RoutingTable makeRoutingTable(NetworkInstance networkInstance) {
-		return new APBRRoutingTable(this, networkInstance);
+		return new CircleRoutingTable(this, networkInstance);
 	}
 
 	@Override
-	public boolean attributesEqual(APBRNetworkType apbrNetworkType) {
-		return this.bitLength == apbrNetworkType.bitLength && this.numParts == apbrNetworkType.numParts;
+	public boolean attributesEqual(CircleNetworkType circleNetworkType) {
+		return this.hashAlgorithm == circleNetworkType.hashAlgorithm && this.byteLength == circleNetworkType.byteLength;
 	}
 
 	@Override
 	public int attributesHashCode() {
-		return numParts<<16 + bitLength;
+		return hashAlgorithm.hashCode() + byteLength;
 	}
 
 }

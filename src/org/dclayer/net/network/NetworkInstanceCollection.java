@@ -8,8 +8,18 @@ public class NetworkInstanceCollection {
 	private NetworkInstance[] curArray;
 	
 	public synchronized void addNetworkInstance(NetworkInstance networkInstance) {
+		
 		curArray = null;
+		
+		for(NetworkInstance existingNetworkInstance : networkInstances) {
+			if(existingNetworkInstance.getNetworkType().equals(networkInstance.getNetworkType())) {
+				networkInstance.getRoutingTable().connect(existingNetworkInstance.getRoutingTable());
+				break;
+			}
+		}
+		
 		this.networkInstances.add(networkInstance);
+		
 	}
 	
 	public synchronized NetworkInstance findLocal(NetworkType findNetworkType) {

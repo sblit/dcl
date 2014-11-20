@@ -24,8 +24,15 @@ public class AsymmetricKeyPairAddress<T extends Key> extends Address {
 	}
 
 	@Override
-	protected Data makeHashData() {
-		return keyPair.getPublicKey().hashData();
+	protected Data makeData() {
+		return keyPair.getPublicKey().toData();
+	}
+
+	@Override
+	public boolean equals(Object o) {
+		if(o == this) return true;
+		if(!(o instanceof AsymmetricKeyPairAddress)) return false;
+		return keyPair.equals(((AsymmetricKeyPairAddress)o).keyPair);
 	}
 	
 }

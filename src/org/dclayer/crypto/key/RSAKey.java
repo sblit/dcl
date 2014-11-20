@@ -6,7 +6,6 @@ import org.bouncycastle.crypto.InvalidCipherTextException;
 import org.bouncycastle.crypto.encodings.OAEPEncoding;
 import org.bouncycastle.crypto.engines.RSAEngine;
 import org.bouncycastle.crypto.params.RSAKeyParameters;
-import org.dclayer.crypto.Crypto;
 import org.dclayer.exception.crypto.InsufficientKeySizeException;
 import org.dclayer.exception.crypto.InvalidCipherCryptoException;
 import org.dclayer.net.Data;
@@ -45,6 +44,14 @@ public abstract class RSAKey extends Key<RSAKeyParameters> {
 	}
 	
 	@Override
+	public boolean equals(Key key) {
+		if(this == key) return true;
+		if(!(key instanceof RSAKey)) return false;
+		RSAKey rsaKey = (RSAKey) key;
+		return this.getExponent().equals(rsaKey.getExponent()) && this.getModulus().equals(rsaKey.getModulus());
+	}
+	
+	@Override
 	public Data encrypt(Data plainData) throws InvalidCipherCryptoException {
 		
 		OAEPEncoding oaepEncoding = new OAEPEncoding(new RSAEngine());
@@ -79,15 +86,20 @@ public abstract class RSAKey extends Key<RSAKeyParameters> {
 	}
 
 	@Override
-	public Data hashData() {
+	public Data toData() {
 		
 		BigInteger modulus = getModulus();
 		BigInteger exponent = getExponent();
 		
-		Data modulusData = new Data(modulus.toByteArray());
-		Data exponentData = new Data(exponent.toByteArray());
+		byte[] modulusBytes = modulus.toByteArray();
+		byte[] exponentBytes = exponent.toByteArray();
 		
-		return Crypto.sha1(modulusData, exponentData);
+		Data data = new Data(modulusBytes.length + exponentBytes.length);
+		
+		data.setBytes(0, modulusBytes, 0, modulusBytes.length);
+		data.setBytes(modulusBytes.length, exponentBytes, 0, exponentBytes.length);
+		
+		return data;
 		
 	}
 	

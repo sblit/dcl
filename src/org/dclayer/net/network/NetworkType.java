@@ -1,6 +1,5 @@
 package org.dclayer.net.network;
 
-import org.dclayer.apbr.APBRNetworkType;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.MalformedNetworkDescriptorException;
 import org.dclayer.exception.net.parse.NotImplementedParseException;
@@ -9,16 +8,19 @@ import org.dclayer.exception.net.parse.UnsupportedNetworkIdentifierException;
 import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.address.Address;
+import org.dclayer.net.apbr.APBRNetworkType;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.circle.CircleNetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
+import org.dclayer.net.network.routing.RoutingTable;
 import org.dclayer.net.network.slot.NetworkSlot;
-import org.dclayer.net.routing.RoutingTable;
 
 public abstract class NetworkType<T extends NetworkType> extends PacketComponent {
 	
 	public static final String IDENTIFIER_APBR = "org.dclayer.apbr";
+	public static final String IDENTIFIER_CIRCLE = "org.dclayer.circle";
 	
 	public static NetworkType fromByteBuf(ByteBuf byteBuf) throws BufException, ParseException {
 		String descriptor = byteBuf.readString();
@@ -33,6 +35,9 @@ public abstract class NetworkType<T extends NetworkType> extends PacketComponent
 		switch(identifier) {
 		case IDENTIFIER_APBR: {
 			return new APBRNetworkType(attributeString);
+		}
+		case IDENTIFIER_CIRCLE: {
+			return new CircleNetworkType(attributeString);
 		}
 		default: {
 			throw new UnsupportedNetworkIdentifierException(identifier);

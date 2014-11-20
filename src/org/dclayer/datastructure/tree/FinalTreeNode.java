@@ -1,7 +1,5 @@
 package org.dclayer.datastructure.tree;
 
-import java.util.Arrays;
-
 import org.dclayer.net.Data;
 
 /**
@@ -22,6 +20,11 @@ public class FinalTreeNode<T> extends TreeNode<T> {
 	@Override
 	public T get(Data key) {
 		return this.key.equals(key) ? value : null;
+	}
+
+	@Override
+	public T getClosest(Data key, int direction) {
+		return value;
 	}
 
 	@Override

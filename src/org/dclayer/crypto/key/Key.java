@@ -33,9 +33,11 @@ public abstract class Key<T> {
 	public abstract Data encrypt(Data plainData) throws CryptoException;
 	public abstract Data decrypt(Data cipherData) throws CryptoException;
 	
-	public abstract Data hashData();
+	public abstract Data toData();
 	
 	@Override
 	public abstract String toString();
+	
+	public abstract boolean equals(Key<?> key);
 	
 }

@@ -15,6 +15,21 @@ public abstract class TreeNode<T> {
 	 */
 	public abstract T get(Data key);
 	/**
+	 * returns the value for the key that is closest to the given key (might actually even be the given key)
+	 * @param key the key to return the value for
+	 * @return the value for the key that is closest to the given key
+	 */
+	public T getClosest(Data key) {
+		return getClosest(key, 0);
+	}
+	/**
+	 * returns the value for the key that is closest to the given key (might actually even be the given key)
+	 * @param key the key to return the value for
+	 * @param direction 1 if at the current offset, the highest possible value should be used, -1 if the lowest should be used and 0 if the closest should be used
+	 * @return the value for the key that is closest to the given key
+	 */
+	public abstract T getClosest(Data key, int direction);
+	/**
 	 * removes and returns the value for the given key
 	 * @param key the key to remove and return the value for
 	 * @return the value for the given key

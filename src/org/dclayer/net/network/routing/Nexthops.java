@@ -1,4 +1,4 @@
-package org.dclayer.net.routing;
+package org.dclayer.net.network.routing;
 
 import java.util.Iterator;
 
@@ -27,6 +27,14 @@ public class Nexthops implements Iterable<ForwardDestination> {
 	
 	public void append(ForwardDestination forwardDestination) {
 		this.append(new Nexthops(forwardDestination));
+	}
+	
+	public Nexthops getNext() {
+		return next;
+	}
+	
+	public void setNext(Nexthops next) {
+		this.next = next;
 	}
 	
 	public ForwardDestination getForwardDestination() {

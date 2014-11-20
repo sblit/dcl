@@ -1,4 +1,4 @@
-package org.dclayer.apbr;
+package org.dclayer.net.apbr;
 
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
@@ -9,10 +9,6 @@ import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.slot.NetworkSlot;
 
-/**
- * Main address part based routing packet type containing both the type and the message
- * @author Martin Exner
- */
 public class APBRPacket extends NetworkPacket {
 	
 	private APBRNetworkType apbrNetworkType;

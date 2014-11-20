@@ -1,4 +1,4 @@
-package org.dclayer.apbr;
+package org.dclayer.net.apbr;
 
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;

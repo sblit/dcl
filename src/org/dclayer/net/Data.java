@@ -226,6 +226,7 @@ public class Data {
 	
 	@Override
 	public boolean equals(Object object) {
+		if(object == this) return true;
 		if(!(object instanceof Data)) return false;
 		Data data = (Data) object;
 		if(this.length != data.length) return false;

@@ -25,9 +25,9 @@ import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
+import org.dclayer.net.network.routing.Nexthops;
 import org.dclayer.net.network.slot.NetworkSlot;
 import org.dclayer.net.network.slot.NetworkSlotMap;
-import org.dclayer.net.routing.Nexthops;
 
 /**
  * a connection to an application instance
@@ -127,6 +127,8 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 			}
 		};
 		
+		applicationConnectionActionListener.onNetworkInstance(applicationNetworkInstance);
+		
 		NetworkSlot networkSlot = networkSlotMap.add(applicationNetworkInstance);
 		applicationNetworkInstance.setNetworkSlot(networkSlot);
 		
@@ -139,7 +141,7 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 		
 		Log.msg(this, "joined network: %s", networkSlot);
 		
-		sendSlotAssignMessage(networkSlot.getSlot(), networkType);
+		sendSlotAssignMessage(networkSlot.getSlot(), networkType, applicationNetworkInstance.getScaledAddress());
 		
 	}
 	
@@ -220,10 +222,11 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 		send();
 	}
 	
-	private synchronized void sendSlotAssignMessage(int slot, NetworkType networkType) {
+	private synchronized void sendSlotAssignMessage(int slot, NetworkType networkType, Data addressData) {
 		SlotAssignMessage slotAssignMessage = sendA2SPacket.setRevision35Message().setSlotAssignMessage();
 		slotAssignMessage.setSlot(slot);
 		slotAssignMessage.getNetworkTypeComponent().setNetworkType(networkType);
+		slotAssignMessage.setAddressData(addressData);
 		send();
 	}
 	
@@ -254,7 +257,7 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 		joinNetwork(networkType);
 	}
 	
-	public void onReceiveSlotAssignMessage(int slot, NetworkType networkType) {
+	public void onReceiveSlotAssignMessage(int slot, NetworkType networkType, Data addressData) {
 		// TODO illegal
 	}
 	

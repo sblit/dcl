@@ -1,4 +1,4 @@
-package org.dclayer.apbr;
+package org.dclayer.net.apbr;
 
 import java.util.LinkedList;
 
@@ -6,9 +6,10 @@ import org.dclayer.datastructure.tree.ParentTreeNode;
 import org.dclayer.net.Data;
 import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkNode;
+import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
-import org.dclayer.net.routing.Nexthops;
-import org.dclayer.net.routing.RoutingTable;
+import org.dclayer.net.network.routing.Nexthops;
+import org.dclayer.net.network.routing.RoutingTable;
 
 public class APBRRoutingTable extends RoutingTable {
 	
@@ -67,6 +68,11 @@ public class APBRRoutingTable extends RoutingTable {
 	}
 
 	@Override
+	public boolean remove(NetworkNode networkNode) {
+		throw new RuntimeException("not implemented");
+	}
+
+	@Override
 	public Nexthops lookup(Data scaledDestinationAddress, Data scaledOriginAddress, int offset) {
 		
 		Nexthops nexthops = null;
@@ -109,6 +115,26 @@ public class APBRRoutingTable extends RoutingTable {
 		
 		return null;
 		
+	}
+
+	@Override
+	public NetworkType getNetworkType() {
+		return apbrNetworkType;
+	}
+
+	@Override
+	public void connect(RoutingTable routingTable) {
+		
+	}
+
+	@Override
+	public void disconnect() {
+		
+	}
+
+	@Override
+	public String toString() {
+		return "CircleRoutingTable";
 	}
 	
 }

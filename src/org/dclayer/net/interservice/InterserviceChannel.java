@@ -3,8 +3,6 @@ package org.dclayer.net.interservice;
 import java.util.List;
 
 import org.dclayer.DCLService;
-import org.dclayer.apbr.APBRNetworkType;
-import org.dclayer.apbr.APBRPacket;
 import org.dclayer.crypto.challenge.CryptoChallenge;
 import org.dclayer.crypto.challenge.Fixed128ByteCryptoChallenge;
 import org.dclayer.crypto.key.Key;
@@ -15,11 +13,8 @@ import org.dclayer.exception.crypto.CryptoException;
 import org.dclayer.exception.crypto.InsufficientKeySizeException;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
-import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
-import org.dclayer.net.address.APBRAddress;
-import org.dclayer.net.address.Address;
 import org.dclayer.net.address.AsymmetricKeyPairAddress;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.interservice.message.ConnectionbaseNoticeInterserviceMessage;
@@ -43,10 +38,8 @@ import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
-import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.slot.NetworkSlot;
 import org.dclayer.net.network.slot.NetworkSlotMap;
-import org.dclayer.net.routing.ForwardDestination;
 
 public class InterserviceChannel extends ThreadDataChannel implements NetworkPacketProvider {
 	
@@ -95,7 +88,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	private CachedLLA cachedLLA;
 	private AsymmetricKeyPairAddress<RSAKey> asymmetricKeyPairAddress;
 	
-	private APBRAddress trustedRemoteAddress;
+	private AsymmetricKeyPairAddress trustedRemoteAddress;
 	
 	private NetworkSlotMap remoteNetworkSlotMap = new NetworkSlotMap();
 	private NetworkSlotMap localNetworkSlotMap = new NetworkSlotMap();
@@ -227,12 +220,12 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	
 	private void setTrustedRemoteAddress(Key publicKey) {
 		// TODO type safety
-		APBRAddress address = new APBRAddress(KeyPair.fromPublicKey(publicKey));
+		AsymmetricKeyPairAddress address = new AsymmetricKeyPairAddress<>(KeyPair.fromPublicKey(publicKey));
 		Log.msg(this, "setting trusted remote address: %s", address);
 		this.trustedRemoteAddress = address;
 	}
 	
-	public APBRAddress getTrustedRemoteAddress() {
+	public AsymmetricKeyPairAddress getTrustedRemoteAddress() {
 		return trustedRemoteAddress;
 	}
 	
