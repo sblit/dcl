@@ -3,8 +3,8 @@ package org.dclayer.net.interservice;
 import java.util.List;
 
 import org.dclayer.DCLService;
+import org.dclayer.apbr.APBRNetworkType;
 import org.dclayer.apbr.APBRPacket;
-import org.dclayer.apbr.APBRPacketForwardDestination;
 import org.dclayer.crypto.challenge.CryptoChallenge;
 import org.dclayer.crypto.challenge.Fixed128ByteCryptoChallenge;
 import org.dclayer.crypto.key.Key;
@@ -15,10 +15,12 @@ import org.dclayer.exception.crypto.CryptoException;
 import org.dclayer.exception.crypto.InsufficientKeySizeException;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
+import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
 import org.dclayer.net.address.APBRAddress;
 import org.dclayer.net.address.Address;
+import org.dclayer.net.address.AsymmetricKeyPairAddress;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.interservice.message.ConnectionbaseNoticeInterserviceMessage;
 import org.dclayer.net.interservice.message.CryptoChallengeReplyInterserviceMessage;
@@ -37,13 +39,16 @@ import org.dclayer.net.interservice.message.VersionInterserviceMessage;
 import org.dclayer.net.link.channel.data.ThreadDataChannel;
 import org.dclayer.net.llacache.CachedLLA;
 import org.dclayer.net.llacache.LLA;
-import org.dclayer.net.network.APBRNetworkType;
-import org.dclayer.net.network.NetworkPacket;
-import org.dclayer.net.network.NetworkSlot;
-import org.dclayer.net.network.NetworkSlotMap;
+import org.dclayer.net.network.NetworkInstance;
+import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
+import org.dclayer.net.network.component.NetworkPacket;
+import org.dclayer.net.network.component.NetworkPayload;
+import org.dclayer.net.network.slot.NetworkSlot;
+import org.dclayer.net.network.slot.NetworkSlotMap;
+import org.dclayer.net.routing.ForwardDestination;
 
-public class InterserviceChannel extends ThreadDataChannel implements APBRPacketForwardDestination, NetworkPacketProvider {
+public class InterserviceChannel extends ThreadDataChannel implements NetworkPacketProvider {
 	
 	public static long VERSION = 0;
 	
@@ -56,7 +61,6 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	
 	public static byte CONNECTIONBASE_STRANGER = 0;
 	public static byte CONNECTIONBASE_TRUSTED = 1;
-	public static byte CONNECTIONBASE_MEMBER = 2;
 	
 	//
 	
@@ -89,7 +93,7 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	private DCLService dclService;
 	private InterserviceChannelActionListener interserviceChannelActionListener;
 	private CachedLLA cachedLLA;
-	private APBRAddress<RSAKey> localAPBRAddress;
+	private AsymmetricKeyPairAddress<RSAKey> asymmetricKeyPairAddress;
 	
 	private APBRAddress trustedRemoteAddress;
 	
@@ -108,14 +112,14 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	 */
 	private CryptoChallenge trustedSwitchOutCryptoChallenge;
 
-	public InterserviceChannel(DCLService dclService, InterserviceChannelActionListener interserviceChannelActionListener, CachedLLA cachedLLA, APBRAddress<RSAKey> localABPDAddress, long channelId, String channelName) {
+	public InterserviceChannel(DCLService dclService, InterserviceChannelActionListener interserviceChannelActionListener, CachedLLA cachedLLA, AsymmetricKeyPairAddress<RSAKey> asymmetricKeyPairAddress, long channelId, String channelName) {
 		super(cachedLLA.getLink(), channelId, channelName);
 		this.dclService = dclService;
 		this.interserviceChannelActionListener = interserviceChannelActionListener;
 		this.cachedLLA = cachedLLA;
-		this.localAPBRAddress = localABPDAddress;
+		this.asymmetricKeyPairAddress = asymmetricKeyPairAddress;
 		
-		this.inCryptoChallenge = new Fixed128ByteCryptoChallenge(localABPDAddress.getKeyPair().getPrivateKey());
+		this.inCryptoChallenge = new Fixed128ByteCryptoChallenge(asymmetricKeyPairAddress.getKeyPair().getPrivateKey());
 	}
 	
 	public CachedLLA getCachedLLA() {
@@ -142,8 +146,8 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	
 	public void startTrustedSwitch() {
 		setAction(ACTION_TRUSTED_SWITCH);
-		setMaxAllowedOutConnectionBase(CONNECTIONBASE_MEMBER);
-		sendTrustedSwitch(localAPBRAddress.getKeyPair().getPublicKey());
+		setMaxAllowedOutConnectionBase(CONNECTIONBASE_TRUSTED);
+		sendTrustedSwitch(asymmetricKeyPairAddress.getKeyPair().getPublicKey());
 	}
 	
 	private void setVersion(long version) {
@@ -196,12 +200,29 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	}
 	
 	private synchronized void sendInitialNetworkJoinNotices() {
-		NetworkType[] networkTypes = this.localAPBRAddress.getNetworkTypeCollection().copyArray();
-		Log.msg(this, "sending initial network join notices (%d)", networkTypes.length);
-		for(NetworkType networkType : networkTypes) {
-			int slot = localNetworkSlotMap.add(networkType);
-			sendNetworkJoinNotice(networkType, slot);
+		NetworkNode[] networkNodes = this.asymmetricKeyPairAddress.getNetworkInstanceCollection().copyArray();
+		Log.msg(this, "sending initial network join notices (%d)", networkNodes.length);
+		for(NetworkNode networkNode : networkNodes) {
+			joinNetwork(networkNode);
 		}
+	}
+	
+	private void joinedNetwork(NetworkSlot networkSlot) {
+		Log.msg(this, "joining network %s: slot %s", networkSlot.getNetworkNode().getNetworkType(), networkSlot);
+		sendNetworkJoinNotice(networkSlot.getNetworkNode().getNetworkType(), networkSlot.getSlot());
+	}
+	
+	public synchronized void joinNetwork(NetworkNode networkNode) {
+		
+		NetworkSlot networkSlot = localNetworkSlotMap.add(networkNode);
+		
+		NetworkSlot remoteNetworkSlot = remoteNetworkSlotMap.find(networkNode.getNetworkType());
+		
+		networkSlot.setRemoteEquivalent(remoteNetworkSlot);
+		if(remoteNetworkSlot != null) remoteNetworkSlot.setRemoteEquivalent(networkSlot);
+		
+		joinedNetwork(networkSlot);
+		
 	}
 	
 	private void setTrustedRemoteAddress(Key publicKey) {
@@ -214,14 +235,9 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	public APBRAddress getTrustedRemoteAddress() {
 		return trustedRemoteAddress;
 	}
-
-	@Override
-	public Address getAddress() {
-		return trustedRemoteAddress;
-	}
 	
-	public APBRAddress getLocalAddress() {
-		return localAPBRAddress;
+	public AsymmetricKeyPairAddress<RSAKey> getLocalAddress() {
+		return asymmetricKeyPairAddress;
 	}
 
 	@Override
@@ -338,45 +354,98 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 		sendOutInterservicePacket();
 	}
 	
-	private void onRemoteNetworkJoin(NetworkType networkType, int slot, Data addressData) {
-		Log.debug(this, "remote joined network %s, slot %d, address: %s", networkType, slot, addressData);
-		if(networkType.getIdentifier() == NetworkType.IDENTIFIER_APBR) { // this works because all APBRNetworkType instances use the same identifier string instance
-			APBRNetworkType apbrNetworkType = (APBRNetworkType) networkType;
-			remoteAPBRSlotMap.set(apbrNetworkType.getNumParts(), apbrNetworkType.getPartBits(), slot);
+	private void onRemoteNetworkJoin(final NetworkSlot remoteNetworkSlot) {
+		
+		NetworkNode remoteNetworkNode = remoteNetworkSlot.getNetworkNode();
+
+		int slot = remoteNetworkSlot.getSlot();
+		Data addressData = remoteNetworkNode.getScaledAddress();
+		
+		Log.msg(this, "remote joined network %s, slot %d", remoteNetworkNode, slot);
+		
+		NetworkSlot localNetworkSlot = localNetworkSlotMap.find(remoteNetworkNode.getNetworkType());
+		
+		NetworkInstance localNetworkInstance = interserviceChannelActionListener.onRemoteNetworkJoin(this, remoteNetworkNode);
+		if(localNetworkSlot == null && localNetworkInstance != null) {
+			// let's join that network
+			synchronized(this) {
+				if(outConnectionBase >= CONNECTIONBASE_TRUSTED) {
+					localNetworkSlot = localNetworkSlotMap.add(localNetworkInstance);
+					joinedNetwork(localNetworkSlot);
+				} else {
+					startTrustedSwitch();
+				}
+			}
 		}
-		interserviceChannelActionListener.onRemoteNetworkJoin(this, networkType, addressData);
+		
+		remoteNetworkSlot.setRemoteEquivalent(localNetworkSlot);
+		if(localNetworkSlot != null) localNetworkSlot.setRemoteEquivalent(remoteNetworkSlot);
+		
 	}
 	
-	private void onRemoteNetworkLeave(NetworkType networkType, int slot, Data addressData) {
-		Log.debug(this, "remote left network %s (slot %d, address %s)", networkType, slot, addressData);
-		if(networkType.getIdentifier() == NetworkType.IDENTIFIER_APBR) { // this works because all APBRNetworkType instances use the same identifier string instance
-			APBRNetworkType apbrNetworkType = (APBRNetworkType) networkType;
-			remoteAPBRSlotMap.unset(apbrNetworkType.getNumParts(), apbrNetworkType.getPartBits());
+	private void onRemoteNetworkLeave(NetworkSlot remoteNetworkSlot) {
+		
+		NetworkNode remoteNetworkNode = remoteNetworkSlot.getNetworkNode();
+		Data addressData = remoteNetworkNode.getScaledAddress();
+		int slot = remoteNetworkSlot.getSlot();
+		
+		Log.msg(this, "remote left network %s (slot %d, address %s)", remoteNetworkNode, slot, addressData);
+		
+		NetworkSlot localNetworkSlot = remoteNetworkSlot.getRemoteEquivalent();
+		if(localNetworkSlot != null) {
+			remoteNetworkSlot.setRemoteEquivalent(null);
+			localNetworkSlot.setRemoteEquivalent(null);
 		}
-		interserviceChannelActionListener.onRemoteNetworkLeave(this, networkType, addressData);
+		
+		interserviceChannelActionListener.onRemoteNetworkLeave(this, remoteNetworkNode);
+		
 	}
 	
-	private void onNetworkJoinNotice(NetworkType networkType, int slot) {
-		NetworkSlot currentNetworkSlot = remoteNetworkSlotMap.get(slot);
-		if(currentNetworkSlot != null) {
-			onRemoteNetworkLeave(currentNetworkSlot.getNetworkType(), slot, currentNetworkSlot.getAddressData());
+	private void onNetworkJoinNotice(NetworkType networkType, final int slot) {
+		
+		NetworkSlot remoteNetworkSlot = remoteNetworkSlotMap.get(slot);
+		if(remoteNetworkSlot != null) {
+			onRemoteNetworkLeave(remoteNetworkSlot);
 		}
-		NetworkSlot networkSlot = remoteNetworkSlotMap.put(slot, networkType, trustedRemoteAddress);
-		onRemoteNetworkJoin(networkType, slot, networkSlot.getAddressData());
+		
+		NetworkNode remoteNetworkNode = new NetworkNode(networkType, trustedRemoteAddress) {
+			@Override
+			public boolean onForward(NetworkPacket networkPacket) {
+				sendNetworkPacket(networkPacket, slot);
+				return true;
+			}
+		};
+		
+		remoteNetworkSlot = remoteNetworkSlotMap.put(slot, remoteNetworkNode);
+		
+		onRemoteNetworkJoin(remoteNetworkSlot);
+		
 	}
 	
 	private void onNetworkLeaveNotice(int slot) {
-		NetworkSlot networkSlot = remoteNetworkSlotMap.remove(slot);
-		if(networkSlot == null) {
+		NetworkSlot remoteNetworkSlot = remoteNetworkSlotMap.remove(slot);
+		
+		if(remoteNetworkSlot == null) {
+			
 			Log.warning(this, "remote left empty network type slot %d", slot);
+			
 		} else {
-			onRemoteNetworkLeave(networkSlot.getNetworkType(), slot, networkSlot.getAddressData());
+			
+			onRemoteNetworkLeave(remoteNetworkSlot);
+			
 		}
 	}
 	
 	private void onReceiveNetworkPacket(NetworkPacket networkPacket) {
 		
-		if(!interserviceChannelActionListener.onNetworkPacket(this, networkPacket)) {
+		NetworkSlot localNetworkSlot = networkPacket.getNetworkSlot();
+		if(localNetworkSlot.getRemoteEquivalent() == null) {
+			// remote peer sends to our network slot even though itself didn't join that network
+			Log.warning(this, "ignoring network packet on network slot %s, remote did not join that network", localNetworkSlot);
+			return;
+		}
+		
+		if(!localNetworkSlot.getNetworkNode().forward(networkPacket)) {
 			// TODO: could not route, maybe notify remote?
 		}
 		
@@ -527,7 +596,7 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 		
 		NetworkType networkType = networkJoinNoticeInterserviceMessage.getNetworkType();
 		int slot = networkJoinNoticeInterserviceMessage.getSlot();
-		Log.msg(this, "received network join notice for network: %s", networkType);
+		Log.debug(this, "received network join notice for network: %s", networkType);
 		
 		if(inConnectionBase < CONNECTIONBASE_TRUSTED) {
 			Log.msg(this, "ignoring network join notice, incoming connection base insufficient");
@@ -570,7 +639,7 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 	
 	public void onReceiveNetworkPacketInterserviceMessage(NetworkPacketInterserviceMessage networkPacketInterserviceMessage) {
 		
-		if(inConnectionBase < CONNECTIONBASE_MEMBER) {
+		if(inConnectionBase < CONNECTIONBASE_TRUSTED) {
 			Log.msg(this, "ignoring network packet, incoming connection base insufficient");
 			return;
 		}
@@ -578,19 +647,6 @@ public class InterserviceChannel extends ThreadDataChannel implements APBRPacket
 		NetworkPacket networkPacket = networkPacketInterserviceMessage.getNetworkPacket();
 		Log.debug(this, "received network packet on slot %d: %s", networkPacketInterserviceMessage.getSlot(), networkPacket);
 		onReceiveNetworkPacket(networkPacket);
-	}
-
-	@Override
-	public boolean onForward(APBRPacket apbrPacket) {
-		APBRNetworkType apbrNetworkType = apbrPacket.getAPBRNetworkType();
-		Integer slot = remoteAPBRSlotMap.get(apbrNetworkType.getNumParts(), apbrNetworkType.getPartBits());
-		if(slot == null) {
-			Log.warning(this, "not forwarding APBRPacket because remote has not joined network %s", apbrNetworkType);
-		} else {
-			Log.debug(this, "forwarding APBRPacket on slot %d (network %s)", slot, apbrNetworkType);
-			sendNetworkPacket(apbrPacket, slot);
-		}
-		return true;
 	}
 
 	@Override

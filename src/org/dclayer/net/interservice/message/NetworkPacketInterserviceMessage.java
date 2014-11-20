@@ -10,7 +10,7 @@ import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.interservice.InterserviceMessage;
 import org.dclayer.net.interservice.InterservicePacket;
 import org.dclayer.net.interservice.NetworkPacketProvider;
-import org.dclayer.net.network.NetworkPacket;
+import org.dclayer.net.network.component.NetworkPacket;
 
 public class NetworkPacketInterserviceMessage extends InterserviceMessage {
 

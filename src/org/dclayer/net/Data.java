@@ -270,4 +270,27 @@ public class Data {
 		return stringBuilder.toString();
 	}
 	
+	public void parse(String string) {
+		int strlen = string.length();
+		int length = (strlen+1)/2;
+		String chars = string.toLowerCase();
+		prepare(length);
+		for(int i = 0; i < strlen; i++) {
+			int c = chars.charAt(i);
+			byte b;
+			if('a' <= c && c <= 'f') {
+				b = (byte)(c - 'a' + 10);
+			} else {
+				b = (byte)((c - '0') % 10);
+			}
+			int index = (i/2)+offset;
+			if((i%2) == 0) {
+				data[index] = 0;
+			} else {
+				data[index] <<= 4;
+			}
+			data[index] |= b;
+		}
+	}
+	
 }

@@ -2,19 +2,21 @@ package org.dclayer.net.routing;
 
 import java.util.Iterator;
 
-public class Nexthops<T> implements Iterable<ForwardDestination<T>> {
+import org.dclayer.net.network.component.NetworkPacket;
+
+public class Nexthops implements Iterable<ForwardDestination> {
 	
-	private Nexthops<T> next;
-	private ForwardDestination<T> forwardDestination;
+	private Nexthops next;
+	private ForwardDestination forwardDestination;
 	
 	public Nexthops() {
 	}
 	
-	public Nexthops(ForwardDestination<T> forwardDestination) {
+	public Nexthops(ForwardDestination forwardDestination) {
 		this.forwardDestination = forwardDestination;
 	}
 	
-	public void append(Nexthops<T> nexthops) {
+	public void append(Nexthops nexthops) {
 		if(nexthops == this) return; // no loops
 		if(next == null) {
 			this.next = nexthops;
@@ -23,27 +25,27 @@ public class Nexthops<T> implements Iterable<ForwardDestination<T>> {
 		}
 	}
 	
-	public void append(ForwardDestination<T> forwardDestination) {
-		this.append(new Nexthops<T>(forwardDestination));
+	public void append(ForwardDestination forwardDestination) {
+		this.append(new Nexthops(forwardDestination));
 	}
 	
-	public ForwardDestination<T> getForwardDestination() {
+	public ForwardDestination getForwardDestination() {
 		return forwardDestination;
 	}
 	
-	public boolean forward(T message) {
+	public boolean forward(NetworkPacket networkPacket) {
 		boolean success = false;
-		for(ForwardDestination<T> forwardDestination : this) {
-			success |= forwardDestination.onForward(message);
+		for(ForwardDestination forwardDestination : this) {
+			success |= forwardDestination.onForward(networkPacket);
 		}
 		return success;
 	}
 
 	@Override
-	public Iterator<ForwardDestination<T>> iterator() {
-		return new Iterator<ForwardDestination<T>>() {
+	public Iterator<ForwardDestination> iterator() {
+		return new Iterator<ForwardDestination>() {
 			
-			private Nexthops<T> current = Nexthops.this;
+			private Nexthops current = Nexthops.this;
 			
 			@Override
 			public boolean hasNext() {
@@ -51,8 +53,8 @@ public class Nexthops<T> implements Iterable<ForwardDestination<T>> {
 			}
 
 			@Override
-			public ForwardDestination<T> next() {
-				ForwardDestination<T> forwardDestination = current.forwardDestination;
+			public ForwardDestination next() {
+				ForwardDestination forwardDestination = current.forwardDestination;
 				current = current.next;
 				return forwardDestination;
 			}

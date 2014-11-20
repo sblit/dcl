@@ -6,9 +6,8 @@ import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.component.DataComponent;
-import org.dclayer.net.network.APBRNetworkType;
-import org.dclayer.net.network.NetworkPacket;
-import org.dclayer.net.network.NetworkSlot;
+import org.dclayer.net.network.component.NetworkPacket;
+import org.dclayer.net.network.slot.NetworkSlot;
 
 /**
  * Main address part based routing packet type containing both the type and the message
@@ -18,18 +17,20 @@ public class APBRPacket extends NetworkPacket {
 	
 	private APBRNetworkType apbrNetworkType;
 	
+	private Data ownAddressData;
 	private Data addressData;
+	
 	private DataComponent dataComponent = new DataComponent();
 	
 	public APBRPacket(NetworkSlot networkSlot, APBRNetworkType apbrNetworkType) {
 		super(networkSlot);
 		this.apbrNetworkType = apbrNetworkType;
-		this.addressData = new Data((int) Math.ceil(apbrNetworkType.getNumParts()*apbrNetworkType.getPartBits()/8d));
+		this.addressData = this.ownAddressData = new Data(apbrNetworkType.getAddressNumBytes());
 	}
 
 	@Override
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
-		byteBuf.read(addressData);
+		byteBuf.read(addressData = ownAddressData);
 		dataComponent.read(byteBuf);
 	}
 
@@ -53,14 +54,20 @@ public class APBRPacket extends NetworkPacket {
 	public String toString() {
 		return String.format("APBRPacket(address=%s)", addressData);
 	}
-	
-	public APBRNetworkType getAPBRNetworkType() {
-		return apbrNetworkType;
-	}
 
 	@Override
 	public Data getDestinationAddressData() {
 		return addressData;
+	}
+
+	@Override
+	public void setDestinationAddressData(Data destinationAddressData) {
+		this.addressData = destinationAddressData;
+	}
+
+	@Override
+	public DataComponent getDataComponent() {
+		return dataComponent;
 	}
 
 }

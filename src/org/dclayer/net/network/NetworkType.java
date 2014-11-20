@@ -1,5 +1,6 @@
 package org.dclayer.net.network;
 
+import org.dclayer.apbr.APBRNetworkType;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.MalformedNetworkDescriptorException;
 import org.dclayer.exception.net.parse.NotImplementedParseException;
@@ -9,10 +10,13 @@ import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.address.Address;
 import org.dclayer.net.buf.ByteBuf;
-import org.dclayer.net.routing.ForwardDestination;
+import org.dclayer.net.network.component.NetworkPacket;
+import org.dclayer.net.network.component.NetworkPayload;
+import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
+import org.dclayer.net.network.slot.NetworkSlot;
 import org.dclayer.net.routing.RoutingTable;
 
-public abstract class NetworkType extends PacketComponent {
+public abstract class NetworkType<T extends NetworkType> extends PacketComponent {
 	
 	public static final String IDENTIFIER_APBR = "org.dclayer.apbr";
 	
@@ -22,12 +26,16 @@ public abstract class NetworkType extends PacketComponent {
 		if(parts.length < 2) throw new MalformedNetworkDescriptorException(descriptor);
 		String identifier = parts[0];
 		String attributeString = parts[1];
+		return make(identifier, attributeString);
+	}
+	
+	public static NetworkType make(String identifier, String attributeString) throws ParseException {
 		switch(identifier) {
 		case IDENTIFIER_APBR: {
 			return new APBRNetworkType(attributeString);
 		}
 		default: {
-			throw new UnsupportedNetworkIdentifierException(descriptor);
+			throw new UnsupportedNetworkIdentifierException(identifier);
 		}
 		}
 	}
@@ -68,21 +76,31 @@ public abstract class NetworkType extends PacketComponent {
 	
 	@Override
 	public String toString() {
-		return String.format("(%s) %s %s", isActive() ? "active" : "passive", identifier, getAttributeString());
+		return String.format("%s %s", identifier, getAttributeString());
 	}
 	
-	public abstract boolean isActive();
-	public abstract <T> void activate(ForwardDestination<T> forwardDestination);
-	
-	public abstract RoutingTable getRoutingTable();
-	public abstract Data getScaledAddress();
+	@Override
+	public int hashCode() {
+		return identifier.hashCode() + attributesHashCode();
+	}
 	
 	public abstract String getAttributeString();
-	public abstract Data scaleAddress(Address address);
 	
+	public abstract Data scaleAddress(Address address);
+	public abstract int getAddressNumBytes();
+	
+	public abstract RoutingTable makeRoutingTable(NetworkInstance networkInstance);
 	public abstract NetworkPacket makeNetworkPacket(NetworkSlot networkSlot);
 	
-	@Override
-	public abstract boolean equals(Object o);
+	public abstract NetworkPayload makeInNetworkPayload(CommonNetworkPayloadProperties commonNetworkPayloadProperties);
+	public abstract NetworkPayload makeOutNetworkPayload(Data sourceAddressData, CommonNetworkPayloadProperties commonNetworkPayloadProperties);
+	
+	public abstract int attributesHashCode();
+	public abstract boolean attributesEqual(T networkType);
+	
+	public final boolean equals(Object o) {
+		if(!(this.getClass().isInstance(o))) return false;
+		return attributesEqual((T) o);
+	}
 	
 }

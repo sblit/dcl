@@ -6,11 +6,11 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.LinkedList;
 
+import org.dclayer.apbr.APBRNetworkType;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.llacache.InetSocketLLA;
 import org.dclayer.net.lladatabase.LLADatabase;
-import org.dclayer.net.network.APBRNetworkType;
 
 public class DCL {
 	
@@ -77,8 +77,7 @@ public class DCL {
 		}
 		
 		for(APBRNetworkType apbrNetworkType : apbrNetworkTypes) {
-			apbrNetworkType.activate(service);
-			service.getServiceAPBRAddress().getNetworkTypeCollection().addNetworkType(apbrNetworkType);
+			service.join(apbrNetworkType);
 		}
 		
 	}

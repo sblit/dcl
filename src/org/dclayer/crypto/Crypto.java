@@ -53,9 +53,13 @@ public class Crypto {
 	}
 	
 	public static KeyPair generateAPBRAddressRSAKeyPair() {
-
+		return generateAddressRSAKeyPair();
+	}
+	
+	public static KeyPair generateAddressRSAKeyPair() {
+		
 		return generateRSAKeyPair(RSA_ADDRESS_KEY_NUMBITS, RSA_ADDRESS_KEY_CERTAINTY);
-
+		
 	}
 	
 	public static Data sha1(Data... inputDatas) {

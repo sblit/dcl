@@ -2,116 +2,83 @@ package org.dclayer.net.a2s.rev35.message;
 
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
-import org.dclayer.net.ApplicationIdentifier;
 import org.dclayer.net.PacketComponent;
+import org.dclayer.net.a2s.ApplicationConnection;
 import org.dclayer.net.a2s.rev35.Message;
 import org.dclayer.net.a2s.rev35.Rev35Message;
-import org.dclayer.net.a2s.rev35.component.ApplicationIdentifierComponent;
+import org.dclayer.net.a2s.rev35.component.AddressComponent;
 import org.dclayer.net.a2s.rev35.component.DataComponent;
-import org.dclayer.net.a2s.rev35.component.ServiceAddressComponent;
+import org.dclayer.net.a2s.rev35.component.NumberComponent;
 import org.dclayer.net.buf.ByteBuf;
-import org.dclayer.net.serviceaddress.ServiceAddress;
 
 public class DataMessage extends Rev35Message {
-	private ApplicationIdentifierComponent destinationApplicationIdentifierComponent, sourceApplicationIdentifierComponent;
-	private ServiceAddressComponent serviceAddressComponent;
-	private DataComponent dataComponent;
 	
-	/**
-	 * constructor called when this {@link PacketComponent} is reconstructed from data in a {@link ByteBuf}
-	 * @param byteBuf the {@link ByteBuf} this {@link PacketComponent} is read from
-	 * @throws ParseException thrown if the {@link ByteBuf} can not be parsed
-	 * @throws BufException thrown if an operation on the {@link ByteBuf} fails
-	 */
-	public DataMessage(ByteBuf byteBuf) throws ParseException, BufException {
-		super(byteBuf);
+	private NumberComponent slotNumberComponent = new NumberComponent();
+	private AddressComponent addressComponent = new AddressComponent();
+	private DataComponent dataComponent = new DataComponent();
+	
+	@Override
+	public void read(ByteBuf byteBuf) throws ParseException, BufException {
+		
+		slotNumberComponent.read(byteBuf);
+		addressComponent.read(byteBuf);
+		dataComponent.read(byteBuf);
 	}
 	
-	/**
-	 * constructor called when this {@link PacketComponent} is newly created rather than reconstructed from data
-	 */
-	public DataMessage(ApplicationIdentifierComponent destinationApplicationIdentifierComponent, ApplicationIdentifierComponent sourceApplicationIdentifierComponent, ServiceAddressComponent serviceAddressComponent, DataComponent dataComponent) {
-		this.destinationApplicationIdentifierComponent = destinationApplicationIdentifierComponent;
-		this.sourceApplicationIdentifierComponent = sourceApplicationIdentifierComponent;
-		this.serviceAddressComponent = serviceAddressComponent;
-		this.dataComponent = dataComponent;
+	@Override
+	public void write(ByteBuf byteBuf) throws BufException {
+		
+		slotNumberComponent.write(byteBuf);
+		byteBuf.write((byte)' ');
+		addressComponent.write(byteBuf);
+		byteBuf.write((byte)' ');
+		dataComponent.write(byteBuf);
 		
 	}
 	
-	/**
-	 * returns the {@link ApplicationIdentifierComponent} containing the destination {@link ApplicationIdentifier} of this {@link DataMessage} 
-	 * @return the {@link ApplicationIdentifierComponent} containing the destination {@link ApplicationIdentifier} of this {@link DataMessage}
-	 */
-	public ApplicationIdentifierComponent getDestinationApplicationIdentifierComponent() {
-		return destinationApplicationIdentifierComponent;
+	@Override
+	public int length() {
+		return 	+ slotNumberComponent.length()
+				+ 1
+				+ addressComponent.length()
+				+ 1
+				+ dataComponent.length();
 	}
 	
-	/**
-	 * returns the {@link ApplicationIdentifierComponent} containing the source {@link ApplicationIdentifier} of this {@link DataMessage} 
-	 * @return the {@link ApplicationIdentifierComponent} containing the source {@link ApplicationIdentifier} of this {@link DataMessage}
-	 */
-	public ApplicationIdentifierComponent getSourceApplicationIdentifierComponent() {
-		return sourceApplicationIdentifierComponent;
+	@Override
+	public String toString() {
+		return "DataMessage";
 	}
 	
-	/**
-	 * returns the {@link ServiceAddressComponent} containing the {@link ServiceAddress} of this {@link DataMessage}
-	 * @return the {@link ServiceAddressComponent} containing the {@link ServiceAddress} of this {@link DataMessage}
-	 */
-	public ServiceAddressComponent getServiceAddressComponent() {
-		return serviceAddressComponent;
+	@Override
+	public PacketComponent[] getChildren() {
+		return new PacketComponent[] {
+				slotNumberComponent,
+				addressComponent,
+				dataComponent
+			};
 	}
 	
-	/**
-	 * returns the {@link DataComponent} containing the data of this {@link DataMessage}
-	 * @return the {@link DataComponent} containing the data of this {@link DataMessage}
-	 */
+	@Override
+	public byte getType() {
+		return Message.DATA;
+	}
+	
+	public NumberComponent getSlotNumberComponent() {
+		return slotNumberComponent;
+	}
+	
+	public AddressComponent getAddressComponent() {
+		return addressComponent;
+	}
+	
 	public DataComponent getDataComponent() {
 		return dataComponent;
 	}
 
 	@Override
-	public void read(ByteBuf byteBuf) throws ParseException, BufException {
-		destinationApplicationIdentifierComponent = new ApplicationIdentifierComponent(byteBuf);
-		sourceApplicationIdentifierComponent = new ApplicationIdentifierComponent(byteBuf);
-		serviceAddressComponent = new ServiceAddressComponent(byteBuf);
-		dataComponent = new DataComponent(byteBuf);
-	}
-
-	@Override
-	public void write(ByteBuf byteBuf) throws BufException {
-		destinationApplicationIdentifierComponent.write(byteBuf);
-		sourceApplicationIdentifierComponent.write(byteBuf);
-		serviceAddressComponent.write(byteBuf);
-		dataComponent.write(byteBuf);
-	}
-
-	@Override
-	public int length() {
-		return destinationApplicationIdentifierComponent.length()
-				+ sourceApplicationIdentifierComponent.length()
-				+ serviceAddressComponent.length()
-				+ dataComponent.length();
-	}
-
-	@Override
-	public String toString() {
-		return "DataMessage";
-	}
-
-	@Override
-	public PacketComponent[] getChildren() {
-		return new PacketComponent[] {
-				destinationApplicationIdentifierComponent,
-				sourceApplicationIdentifierComponent,
-				serviceAddressComponent,
-				dataComponent
-			};
-	}
-
-	@Override
-	public byte getType() {
-		return Message.DATA;
+	public void callOnReceiveMethod(ApplicationConnection applicationConnection) {
+		applicationConnection.onReceiveDataMessage(slotNumberComponent.getNumber(), addressComponent.getAddressData(), dataComponent.getData());
 	}
 	
 }

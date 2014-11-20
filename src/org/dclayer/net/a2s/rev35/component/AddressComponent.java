@@ -7,31 +7,34 @@ import org.dclayer.net.PacketComponent;
 import org.dclayer.net.a2s.rev35.Rev35PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
 
-public class DataComponent extends Rev35PacketComponent {
+public class AddressComponent extends Rev35PacketComponent {
 	
-	private Data data;
-
+	private Data addressData;
+	private Data ownAddressData = new Data();
+	
 	@Override
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
-		String string = byteBuf.readTextModeString();
-		data = new Data(string.getBytes(ByteBuf.CHARSET_ASCII));
-		byteBuf.readTilSpaceOrEOL();
+		
+		String address = byteBuf.readSpaceTerminatedString();
+		(addressData = ownAddressData).parse(address);
+		
 	}
 
 	@Override
 	public void write(ByteBuf byteBuf) throws BufException {
-		byteBuf.writeTextModeString(new String(data.copyToByteArray(), ByteBuf.CHARSET_ASCII));
-		byteBuf.write((byte)' ');
+		
+		byteBuf.writeNonTerminatedString(addressData == null ? "0" : addressData.toString());
+		
 	}
 
 	@Override
 	public int length() {
-		return 2 + data.length() + 1;
+		return (addressData == null ? 0 : addressData.length())*2 + 1;
 	}
 
 	@Override
 	public String toString() {
-		return String.format("DataComponent(len=%d)", data.length());
+		return String.format("AddressComponent(address=%s)", addressData);
 	}
 
 	@Override
@@ -39,12 +42,12 @@ public class DataComponent extends Rev35PacketComponent {
 		return null;
 	}
 	
-	public Data getData() {
-		return data;
+	public Data getAddressData() {
+		return addressData;
 	}
 	
-	public void setData(Data data) {
-		this.data = data;
+	public void setAddressData(Data addressData) {
+		this.addressData = addressData;
 	}
 	
 }

@@ -1,7 +1,7 @@
 package org.dclayer.net.address;
 
 import org.dclayer.net.Data;
-import org.dclayer.net.network.NetworkTypeCollection;
+import org.dclayer.net.network.NetworkInstanceCollection;
 
 /**
  * An DCL node address
@@ -9,15 +9,15 @@ import org.dclayer.net.network.NetworkTypeCollection;
  */
 public abstract class Address {
 	
-	private NetworkTypeCollection networkTypeCollection;
+	private NetworkInstanceCollection networkTypeCollection;
 	
 	private Data hashData = null;
 	
-	public Address(NetworkTypeCollection networkTypeCollection) {
+	public Address(NetworkInstanceCollection networkTypeCollection) {
 		this.networkTypeCollection = networkTypeCollection;
 	}
 	
-	public NetworkTypeCollection getNetworkTypeCollection() {
+	public NetworkInstanceCollection getNetworkInstanceCollection() {
 		return networkTypeCollection;
 	}
 	

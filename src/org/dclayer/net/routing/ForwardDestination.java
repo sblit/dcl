@@ -1,8 +1,7 @@
 package org.dclayer.net.routing;
 
-import org.dclayer.net.address.Address;
+import org.dclayer.net.network.component.NetworkPacket;
 
-public interface ForwardDestination<T> {
-	public boolean onForward(T object);
-	public Address getAddress();
+public interface ForwardDestination {
+	public abstract boolean onForward(NetworkPacket networkPacket);
 }

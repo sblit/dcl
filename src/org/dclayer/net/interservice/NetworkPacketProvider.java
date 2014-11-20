@@ -1,6 +1,6 @@
 package org.dclayer.net.interservice;
 
-import org.dclayer.net.network.NetworkPacket;
+import org.dclayer.net.network.component.NetworkPacket;
 
 
 public interface NetworkPacketProvider {
