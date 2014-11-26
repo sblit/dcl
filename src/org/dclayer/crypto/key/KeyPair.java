@@ -33,7 +33,8 @@ public class KeyPair<T extends Key> {
 	}
 	
 	public boolean equals(KeyPair<?> keyPair) {
-		return this.publicKey.equals(keyPair.publicKey) && this.privateKey.equals(keyPair.privateKey);
+		return ((this.publicKey != null && keyPair.publicKey != null && this.publicKey.equals(keyPair.publicKey)) || this.publicKey == keyPair.publicKey)
+				&& ((this.privateKey != null && keyPair.privateKey != null && this.privateKey.equals(keyPair.privateKey)) || this.privateKey == keyPair.privateKey);
 	}
 	
 }

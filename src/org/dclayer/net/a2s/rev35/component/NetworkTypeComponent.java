@@ -4,9 +4,10 @@ import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.componentinterface.NetworkTypeComponentI;
 import org.dclayer.net.network.NetworkType;
 
-public class NetworkTypeComponent extends PacketComponent {
+public class NetworkTypeComponent extends PacketComponent implements NetworkTypeComponentI {
 	
 	private NetworkType networkType;
 

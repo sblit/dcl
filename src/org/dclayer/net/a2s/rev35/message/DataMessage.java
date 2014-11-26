@@ -3,15 +3,16 @@ package org.dclayer.net.a2s.rev35.message;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.PacketComponent;
-import org.dclayer.net.a2s.ApplicationConnection;
-import org.dclayer.net.a2s.rev35.Message;
+import org.dclayer.net.a2s.A2SMessageReceiver;
+import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
+import org.dclayer.net.a2s.message.DataMessageI;
 import org.dclayer.net.a2s.rev35.Rev35Message;
 import org.dclayer.net.a2s.rev35.component.AddressComponent;
 import org.dclayer.net.a2s.rev35.component.DataComponent;
 import org.dclayer.net.a2s.rev35.component.NumberComponent;
 import org.dclayer.net.buf.ByteBuf;
 
-public class DataMessage extends Rev35Message {
+public class DataMessage extends A2SRevisionSpecificMessage implements DataMessageI {
 	
 	private NumberComponent slotNumberComponent = new NumberComponent();
 	private AddressComponent addressComponent = new AddressComponent();
@@ -61,10 +62,10 @@ public class DataMessage extends Rev35Message {
 	
 	@Override
 	public byte getType() {
-		return Message.DATA;
+		return Rev35Message.DATA;
 	}
 	
-	public NumberComponent getSlotNumberComponent() {
+	public NumberComponent getSlotNumComponent() {
 		return slotNumberComponent;
 	}
 	
@@ -77,8 +78,8 @@ public class DataMessage extends Rev35Message {
 	}
 
 	@Override
-	public void callOnReceiveMethod(ApplicationConnection applicationConnection) {
-		applicationConnection.onReceiveDataMessage(slotNumberComponent.getNumber(), addressComponent.getAddressData(), dataComponent.getData());
+	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
+		a2sMessageReceiver.onReceiveDataMessage((int) slotNumberComponent.getNum(), addressComponent.getAddressData(), dataComponent.getData());
 	}
 	
 }

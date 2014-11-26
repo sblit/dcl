@@ -5,57 +5,64 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.component.FlexNum;
+import org.dclayer.net.component.NetworkTypeComponent;
 import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.interservice.InterserviceMessage;
 import org.dclayer.net.interservice.InterservicePacket;
-import org.dclayer.net.network.NetworkType;
 
 public class NetworkJoinNoticeInterserviceMessage extends InterserviceMessage {
 
-	private FlexNum slotFlexNum = new FlexNum(0, Integer.MAX_VALUE);
-	private NetworkType networkType;
+	private FlexNum addressSlotFlexNum = new FlexNum(0, Integer.MAX_VALUE);
+	private FlexNum networkSlotFlexNum = new FlexNum(0, Integer.MAX_VALUE);
+	private NetworkTypeComponent networkTypeComponent = new NetworkTypeComponent(true);
 
 	@Override
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
-		slotFlexNum.read(byteBuf);
-		this.networkType = NetworkType.fromByteBuf(byteBuf);
+		addressSlotFlexNum.read(byteBuf);
+		networkSlotFlexNum.read(byteBuf);
+		networkTypeComponent.read(byteBuf);
 	}
 
 	@Override
 	public void write(ByteBuf byteBuf) throws BufException {
-		slotFlexNum.write(byteBuf);
-		networkType.write(byteBuf);
+		addressSlotFlexNum.write(byteBuf);
+		networkSlotFlexNum.write(byteBuf);
+		networkTypeComponent.write(byteBuf);
 	}
 
 	@Override
 	public int length() {
-		return slotFlexNum.length() + networkType.length();
+		return addressSlotFlexNum.length() + networkSlotFlexNum.length() + networkTypeComponent.length();
 	}
 
 	@Override
 	public PacketComponent[] getChildren() {
-		return null;
+		return new PacketComponent[] { networkTypeComponent };
 	}
 
 	@Override
 	public String toString() {
-		return String.format("NetworkJoinNoticeInterserviceMessage(slot=%d, network=%s)", slotFlexNum.getNum(), networkType);
+		return String.format("NetworkJoinNoticeInterserviceMessage(addressSlot=%d, networkSlot=%d)", addressSlotFlexNum.getNum(), networkSlotFlexNum.getNum());
 	}
 	
-	public NetworkType getNetworkType() {
-		return networkType;
+	public NetworkTypeComponent getNetworkTypeComponent() {
+		return networkTypeComponent;
 	}
 	
-	public void setNetworkType(NetworkType networkType) {
-		this.networkType = networkType;
+	public int getAddressSlot() {
+		return (int) addressSlotFlexNum.getNum();
 	}
 	
-	public int getSlot() {
-		return (int) slotFlexNum.getNum();
+	public void setAddressSlot(int slot) {
+		addressSlotFlexNum.setNum(slot);
 	}
 	
-	public void setSlot(int slot) {
-		slotFlexNum.setNum(slot);
+	public int getNetworkSlot() {
+		return (int) networkSlotFlexNum.getNum();
+	}
+	
+	public void setNetworkSlot(int slot) {
+		networkSlotFlexNum.setNum(slot);
 	}
 
 	@Override

@@ -4,16 +4,17 @@ import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
-import org.dclayer.net.a2s.ApplicationConnection;
-import org.dclayer.net.a2s.rev35.Message;
+import org.dclayer.net.a2s.A2SMessageReceiver;
+import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
+import org.dclayer.net.a2s.message.SlotAssignMessageI;
 import org.dclayer.net.a2s.rev35.Rev35Message;
 import org.dclayer.net.a2s.rev35.component.NetworkTypeComponent;
 import org.dclayer.net.a2s.rev35.component.NumberComponent;
 import org.dclayer.net.buf.ByteBuf;
 
-public class SlotAssignMessage extends Rev35Message {
+public class SlotAssignMessage extends A2SRevisionSpecificMessage implements SlotAssignMessageI {
 
-	private NumberComponent slotNumberComponent = new NumberComponent();
+	private NumberComponent slotNumberComponent = new NumberComponent(0, Integer.MAX_VALUE);
 	private NetworkTypeComponent networkTypeComponent = new NetworkTypeComponent();
 	
 	private Data ownAddressData = new Data();
@@ -42,7 +43,7 @@ public class SlotAssignMessage extends Rev35Message {
 	
 	@Override
 	public String toString() {
-		return String.format("SlotAssignMessage(slot=%d, address=%s)", slotNumberComponent.getNumber(), addressData);
+		return String.format("SlotAssignMessage(slot=%d, address=%s)", slotNumberComponent.getNum(), addressData);
 	}
 	
 	@Override
@@ -52,7 +53,7 @@ public class SlotAssignMessage extends Rev35Message {
 	
 	@Override
 	public byte getType() {
-		return Message.SLOT_ASSIGN;
+		return Rev35Message.SLOT_ASSIGN;
 	}
 	
 	public NetworkTypeComponent getNetworkTypeComponent() {
@@ -60,11 +61,11 @@ public class SlotAssignMessage extends Rev35Message {
 	}
 	
 	public int getSlot() {
-		return slotNumberComponent.getNumber();
+		return (int) slotNumberComponent.getNum();
 	}
 	
 	public void setSlot(int slot) {
-		slotNumberComponent.setNumber(slot);
+		slotNumberComponent.setNum(slot);
 	}
 	
 	public void setAddressData(Data addressData) {
@@ -76,8 +77,8 @@ public class SlotAssignMessage extends Rev35Message {
 	}
 
 	@Override
-	public void callOnReceiveMethod(ApplicationConnection applicationConnection) {
-		applicationConnection.onReceiveSlotAssignMessage(getSlot(), networkTypeComponent.getNetworkType(), addressData);
+	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
+		a2sMessageReceiver.onReceiveSlotAssignMessage(getSlot(), networkTypeComponent.getNetworkType(), addressData);
 	}
 	
 }

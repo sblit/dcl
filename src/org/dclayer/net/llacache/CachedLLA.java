@@ -1,5 +1,6 @@
 package org.dclayer.net.llacache;
 
+import org.dclayer.listener.net.CachedLLAStatusListener;
 import org.dclayer.net.Data;
 import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.link.Link;
@@ -14,6 +15,14 @@ public class CachedLLA {
 	public static final int CONNECTING_LINK = 2;
 	public static final int CONNECTING_CHANNEL = 3;
 	public static final int CONNECTED = 4;
+	
+	public static final String[] STATUS_NAMES = new String[] {
+		"disconnected",
+		"connecting_prelink",
+		"connecting_link",
+		"connecting_channel",
+		"connected"
+	};
 	
 	//
 	
@@ -33,6 +42,8 @@ public class CachedLLA {
 	 */
 	private Data firstLinkPacketPrefixData;
 	
+	private CachedLLAStatusListener cachedLLAStatusListener;
+	
 	public CachedLLA(LLA lla) {
 		this.lla = lla;
 	}
@@ -42,7 +53,9 @@ public class CachedLLA {
 	}
 	
 	public synchronized void setStatus(int status) {
+		int oldStatus = this.status;
 		this.status = status;
+		if(cachedLLAStatusListener != null) cachedLLAStatusListener.onStatusChanged(this, oldStatus, status);
 	}
 	
 	/**
@@ -55,6 +68,7 @@ public class CachedLLA {
 	public synchronized boolean changeStatus(int fromStatus, int toStatus) {
 		if(this.status != fromStatus) return false;
 		this.status = toStatus;
+		if(cachedLLAStatusListener != null) cachedLLAStatusListener.onStatusChanged(this, fromStatus, toStatus);
 		return true;
 	}
 	
@@ -86,9 +100,17 @@ public class CachedLLA {
 		return firstLinkPacketPrefixData;
 	}
 	
+	public void setCachedLLAStatusListener(CachedLLAStatusListener cachedLLAStatusListener) {
+		this.cachedLLAStatusListener = cachedLLAStatusListener;
+	}
+	
+	public CachedLLAStatusListener getCachedLLAStatusListener() {
+		return cachedLLAStatusListener;
+	}
+	
 	@Override
 	public String toString() {
-		return lla.toString();
+		return String.format("%s (%s)", lla.toString(), STATUS_NAMES[status]);
 	}
 	
 }

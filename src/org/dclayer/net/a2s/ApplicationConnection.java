@@ -12,27 +12,28 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
-import org.dclayer.net.a2s.rev35.message.DataMessage;
-import org.dclayer.net.a2s.rev35.message.SlotAssignMessage;
+import org.dclayer.net.a2s.message.DataMessageI;
+import org.dclayer.net.a2s.message.RevisionMessageI;
+import org.dclayer.net.a2s.message.SlotAssignMessageI;
+import org.dclayer.net.a2s.rev0.Rev0Message;
+import org.dclayer.net.a2s.rev35.Rev35Message;
 import org.dclayer.net.address.Address;
-import org.dclayer.net.address.AsymmetricKeyPairAddress;
 import org.dclayer.net.buf.StreamByteBuf;
+import org.dclayer.net.componentinterface.AbsKeyComponentI;
 import org.dclayer.net.network.ApplicationNetworkInstance;
-import org.dclayer.net.network.NetworkInstance;
-import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkInstanceCollection;
+import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
-import org.dclayer.net.network.routing.Nexthops;
 import org.dclayer.net.network.slot.NetworkSlot;
 import org.dclayer.net.network.slot.NetworkSlotMap;
 
 /**
  * a connection to an application instance
  */
-public class ApplicationConnection extends Thread implements HierarchicalLevel {
+public class ApplicationConnection extends Thread implements A2SMessageReceiver, HierarchicalLevel {
 	
 	private Socket socket;
 	
@@ -41,12 +42,20 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 	
 	private StreamByteBuf streamByteBuf;
 	
-	private A2SPacket receiveA2SPacket = new A2SPacket();
-	private A2SPacket sendA2SPacket = new A2SPacket();
+	private final Rev0Message receiveRev0Message = new Rev0Message();
+	private final Rev0Message sendRev0Message = new Rev0Message();
+	
+	private final Rev35Message receiveRev35Message = new Rev35Message();
+	private final Rev35Message sendRev35Message = new Rev35Message();
+	
+	private A2SMessage receiveMessage = receiveRev35Message;
+	private A2SMessage sendMessage = sendRev35Message;
 	
 	private NetworkSlotMap networkSlotMap = new NetworkSlotMap();
 	
 	//
+	
+	private int revision = 0;
 	
 	private KeyPair applicationAddressKeyPair = null;
 	private Address applicationAddress = null;
@@ -84,10 +93,15 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 		
 	}
 	
+	public void setApplicationAddressKeyPair(KeyPair applicationAddressKeyPair) {
+		this.applicationAddressKeyPair = applicationAddressKeyPair;
+		this.applicationAddress = new Address(applicationAddressKeyPair, new NetworkInstanceCollection());
+		applicationConnectionActionListener.onAddress(applicationAddress);
+	}
+	
 	private void generateKeyPair() {
 		Log.msg(this, "generating rsa address key pair");
-		this.applicationAddressKeyPair = Crypto.generateAddressRSAKeyPair();
-		this.applicationAddress = new AsymmetricKeyPairAddress(applicationAddressKeyPair, new NetworkInstanceCollection());
+		setApplicationAddressKeyPair(Crypto.generateAddressRSAKeyPair());
 		Log.msg(this, "generated %d bits rsa address key pair", this.applicationAddressKeyPair.getPublicKey().getNumBits());
 	}
 	
@@ -127,9 +141,12 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 			}
 		};
 		
+		applicationAddress.getNetworkInstanceCollection().addNetworkInstance(applicationNetworkInstance);
+		
 		applicationConnectionActionListener.onNetworkInstance(applicationNetworkInstance);
 		
-		NetworkSlot networkSlot = networkSlotMap.add(applicationNetworkInstance);
+		NetworkSlot networkSlot = networkSlotMap.add(networkType);
+		networkSlot.addNetworkNode(applicationNetworkInstance);
 		applicationNetworkInstance.setNetworkSlot(networkSlot);
 		
 		// TODO make these changeable for the connected application
@@ -150,7 +167,7 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 		for(;;) {
 			
 			try {
-				receiveA2SPacket.read(streamByteBuf);
+				receiveMessage.read(streamByteBuf);
 			} catch (ParseException e) {
 				Log.exception(this, e);
 				close();
@@ -161,9 +178,9 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 				return;
 			}
 			
-			Log.debug(this, "received application to service packet: %s", receiveA2SPacket.represent(true));
+			Log.debug(this, "received application to service message: %s", receiveMessage.represent(true));
 			
-			receiveA2SPacket.callOnReceiveMethod(this);
+			receiveMessage.callOnReceiveMethod(this);
 			
 		}
 	}
@@ -178,9 +195,9 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 	
 	private void send() {
 		try {
-			sendA2SPacket.write(streamByteBuf);
+			sendMessage.write(streamByteBuf);
 		} catch (BufException e) {
-			Log.exception(this, e, "error while sending application to service packet %s", sendA2SPacket.represent(true));
+			Log.exception(this, e, "error while sending application to service message %s", sendMessage.represent(true));
 			return;
 		}
 	}
@@ -189,7 +206,7 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 	
 	private void sendNetworkPacket(NetworkSlot networkSlot, Data addressData, Data data) {
 		
-		NetworkNode networkNode = networkSlot.getNetworkNode();
+		NetworkNode networkNode = networkSlot.getNetworkNodes().get(0);
 
 		NetworkPacket networkPacket = networkSlot.getNetworkPacket();
 		NetworkPayload networkPayload = networkNode.getOutNetworkPayload();
@@ -214,16 +231,22 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 	
 	//
 	
+	private synchronized void sendRevisionMessage(int revision) {
+		RevisionMessageI revisionMessage = sendMessage.setRevisionMessage();
+		revisionMessage.setRevision(revision);
+		send();
+	}
+	
 	private synchronized void sendDataMessage(int slot, NetworkPayload networkPayload) {
-		DataMessage dataMessage = sendA2SPacket.setRevision35Message().setDataMessage();
-		dataMessage.getSlotNumberComponent().setNumber(slot);
+		DataMessageI dataMessage = sendMessage.setDataMessage();
+		dataMessage.getSlotNumComponent().setNum(slot);
 		dataMessage.getAddressComponent().setAddressData(networkPayload.getSourceAddressData()); // this may be null, doesn't matter though
 		dataMessage.getDataComponent().setData(networkPayload.getPayloadData());
 		send();
 	}
 	
 	private synchronized void sendSlotAssignMessage(int slot, NetworkType networkType, Data addressData) {
-		SlotAssignMessage slotAssignMessage = sendA2SPacket.setRevision35Message().setSlotAssignMessage();
+		SlotAssignMessageI slotAssignMessage = sendMessage.setSlotAssignMessage();
 		slotAssignMessage.setSlot(slot);
 		slotAssignMessage.getNetworkTypeComponent().setNetworkType(networkType);
 		slotAssignMessage.setAddressData(addressData);
@@ -231,6 +254,35 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 	}
 	
 	//
+	
+	public synchronized void onReceiveRevisionMessage(int revision) {
+		
+		Log.debug(this, "onReceiveRevisionMessage(%d)", revision);
+
+		this.revision = revision;
+		
+		switch(revision) {
+		case 0: {
+			this.sendMessage = sendRev0Message;
+			this.receiveMessage = receiveRev0Message;
+			break;
+		}
+		case 35: {
+			this.sendMessage = sendRev35Message;
+			this.receiveMessage = receiveRev35Message;
+			break;
+		}
+		default: {
+			Log.debug(this, "revision %d is not supported, using revision 0", revision);
+			this.revision = 0;
+		}
+		}
+		
+		Log.debug(this, "using revision %d, application connection %sready", this.revision, (revision == this.revision) ? "" : "not ");
+		
+		sendRevisionMessage(this.revision);
+		
+	}
 	
 	public void onReceiveDataMessage(int slot, Data addressData, Data data) {
 		
@@ -259,6 +311,16 @@ public class ApplicationConnection extends Thread implements HierarchicalLevel {
 	
 	public void onReceiveSlotAssignMessage(int slot, NetworkType networkType, Data addressData) {
 		// TODO illegal
+	}
+	
+	@Override
+	public void onReceiveAddressPublicKeyMessage(AbsKeyComponentI absKeyComponentI) {
+		
+	}
+
+	@Override
+	public void onReceiveJoinDefaultNetworksMessage() {
+		
 	}
 	
 	//

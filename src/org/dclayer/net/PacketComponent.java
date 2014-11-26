@@ -6,7 +6,7 @@ import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.s2s.rev0.component.ServiceAddressComponent;
 
 /**
- * abstract class that parts of packets (e.g. {@link Message} and {@link ServiceAddressComponent}) extend.
+ * abstract class that parts of packets (e.g. {@link Rev0Message} and {@link ServiceAddressComponent}) extend.
  */
 public abstract class PacketComponent {
 	/**

@@ -6,8 +6,9 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.exception.net.parse.UnsupportedKeyTypeException;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.componentinterface.KeyComponentI;
 
-public class KeyComponent extends PacketComponent {
+public class KeyComponent extends PacketComponent implements KeyComponentI {
 	
 	private RSAKeyComponent rsaKey = new RSAKeyComponent();
 
@@ -39,10 +40,12 @@ public class KeyComponent extends PacketComponent {
 		return String.format("KeyComponent(type=%02X)", rsaKey.getTypeId());
 	}
 	
+	@Override
 	public RSAKeyComponent setRSAKeyComponent() {
 		return rsaKey;
 	}
 	
+	@Override
 	public AbsKeyComponent getKeyComponent() {
 		return rsaKey;
 	}

@@ -3,13 +3,14 @@ package org.dclayer;
 import java.util.List;
 import java.util.Random;
 
+import org.dclayer.listener.net.CachedLLAStatusListener;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
 import org.dclayer.net.llacache.CachedLLA;
 import org.dclayer.net.llacache.LLA;
 
-public class ConnectionInitiationManager extends Thread implements HierarchicalLevel {
+public class ConnectionInitiationManager extends Thread implements CachedLLAStatusListener, HierarchicalLevel {
 	
 	/**
 	 * the initial delay between sending messages to initiate a connection with an LLA.
@@ -52,6 +53,7 @@ public class ConnectionInitiationManager extends Thread implements HierarchicalL
 	private void connect(LLA lla) {
 		
 		final CachedLLA cachedLLA = dclService.getLLACache().getCachedLLA(lla, true);
+		cachedLLA.setCachedLLAStatusListener(this);
 		
 		if(!cachedLLA.changeStatus(CachedLLA.DISCONNECTED, CachedLLA.CONNECTING_PRELINK)) {
 			Log.debug(this, "not connecting to %s (status not disconnected)", cachedLLA);
@@ -87,13 +89,19 @@ public class ConnectionInitiationManager extends Thread implements HierarchicalL
 					
 				}
 				
-				if(disconnected && cachedLLA.changeStatus(CachedLLA.CONNECTING_PRELINK, CachedLLA.DISCONNECTED)) {
+				if(disconnected) {
+					cachedLLA.changeStatus(CachedLLA.CONNECTING_PRELINK, CachedLLA.DISCONNECTED);
 					Log.debug(ConnectionInitiationManager.this, "could not connect to %s", cachedLLA);
 				}
 				
 			}
 		}).start();
 		
+	}
+
+	@Override
+	public void onStatusChanged(CachedLLA cachedLLA, int oldStatus, int newStatus) {
+		Log.debug(this, "cached LLA %s changed status: %s -> %s", cachedLLA, CachedLLA.STATUS_NAMES[oldStatus], CachedLLA.STATUS_NAMES[newStatus]);
 	}
 	
 }

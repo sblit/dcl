@@ -7,6 +7,8 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.LinkedList;
 
+import org.dclayer.datastructure.map.slotmap.Slot;
+import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.link.Link;
 import org.dclayer.net.link.channel.Channel;
 import org.dclayer.net.link.control.FlowControl;
@@ -30,13 +32,16 @@ public class Log {
 	}
 	
 	public static final IgnoreEntry[] IGNORE = new IgnoreEntry[] {
-		// specify reserved paths here (e.g. { InterserviceChannel.class, DCLService.class, DCL.class })
-		// if the end of a log message's path matches one of the arrays below reserved, the message is not printed
+		// specify reversed paths here (e.g. { InterserviceChannel.class, DCLService.class, DCL.class })
+		// if the end of a log message's path matches one of the arrays below reserved, the message is printed only if
+		// the log level of the message is equal to or higher than the level specified here
+//		new IgnoreEntry(Level.DEBUG, InterserviceChannel.class), // show all log messages from InterserviceChannel instances only
 		new IgnoreEntry(Level.WARNING, UDPSocket.class),
 		new IgnoreEntry(Level.WARNING, FlowControl.class),
 		new IgnoreEntry(Level.WARNING, ResendPacketQueue.class),
 		new IgnoreEntry(Level.WARNING, PacketBackupCollection.class),
 		new IgnoreEntry(Level.WARNING, DiscontinuousBlockCollection.class),
+		new IgnoreEntry(Level.MSG, Slot.class),
 		new IgnoreEntry(Level.MSG, Channel.class),
 		new IgnoreEntry(Level.MSG, Link.class),
 	};
@@ -212,13 +217,12 @@ public class Log {
 	
 	private static boolean ignore(Level l, HierarchicalLevel hierarchicalLevel) {
 		paths: for(IgnoreEntry ignoreEntry : IGNORE) {
-			if(l.ordinal() >= ignoreEntry.belowLevel.ordinal()) continue;
 			HierarchicalLevel hl = hierarchicalLevel;
 			for(Class c : ignoreEntry.reversePath) {
 				if(hl == null || !c.isAssignableFrom(hl.getClass())) continue paths;
 				hl = hl.getParentHierarchicalLevel();
 			}
-			return true;
+			return l.ordinal() < ignoreEntry.belowLevel.ordinal();
 		}
 		return false;
 	}

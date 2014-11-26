@@ -2,15 +2,17 @@ package org.dclayer.net.component;
 
 
 import org.dclayer.exception.net.buf.BufException;
+import org.dclayer.exception.net.parse.NumberOutOfRangeException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.componentinterface.NumComponentI;
 
 /**
  * a flexible number, or, in other words, a data structure representing an integer,
  * self-describing its length
  */
-public class FlexNum extends PacketComponent {
+public class FlexNum extends PacketComponent implements NumComponentI {
 	
 	/**
 	 * the integer this {@link FlexNum} represents
@@ -64,7 +66,7 @@ public class FlexNum extends PacketComponent {
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
 		long num = byteBuf.readFlexNum();
 		if(hasMinMax && (num < minValue || num > maxValue)) {
-			throw new ParseException(String.format("FlexNum %d out of valid range (min %d, max %d)", num, minValue, maxValue));
+			throw new NumberOutOfRangeException(num, minValue, maxValue);
 		}
 		setNum(num);
 	}
@@ -78,6 +80,7 @@ public class FlexNum extends PacketComponent {
 	 * returns the integer this {@link FlexNum} represents
 	 * @return the integer this {@link FlexNum} represents
 	 */
+	@Override
 	public long getNum() {
 		return num;
 	}
@@ -86,6 +89,7 @@ public class FlexNum extends PacketComponent {
 	 * sets the integer this {@link FlexNum} represents
 	 * @param num the integer to represent
 	 */
+	@Override
 	public void setNum(long num) {
 		this.num = num;
 		length = ByteBuf.getFlexNumLength(this.num);

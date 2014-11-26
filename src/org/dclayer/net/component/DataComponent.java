@@ -6,11 +6,12 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.componentinterface.DataComponentI;
 
 /**
  * a {@link PacketComponent} containing data
  */
-public class DataComponent extends PacketComponent {
+public class DataComponent extends PacketComponent implements DataComponentI {
 	/**
 	 * the contained data
 	 */
@@ -33,6 +34,7 @@ public class DataComponent extends PacketComponent {
      * returns the {@link Data} holding the data contained in this {@link DataComponent}
      * @return the {@link Data} holding the data contained in this {@link DataComponent}
      */
+	@Override
     public Data getData() {
     	return data;
     }
@@ -41,6 +43,7 @@ public class DataComponent extends PacketComponent {
      * sets the Data that is contained in this {@link DataComponent}
      * @param data the Data that should be contained in this {@link DataComponent}
      */
+    @Override
 	public void setData(Data data) {
 		this.data = data;
 		this.dataLength.setNum(data.length());

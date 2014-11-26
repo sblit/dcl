@@ -1,8 +1,9 @@
 package org.dclayer.net.network;
 
+import java.util.Iterator;
 import java.util.LinkedList;
 
-public class NetworkInstanceCollection {
+public class NetworkInstanceCollection implements Iterable<NetworkInstance> {
 	
 	private LinkedList<NetworkInstance> networkInstances = new LinkedList<>();
 	private NetworkInstance[] curArray;
@@ -36,6 +37,11 @@ public class NetworkInstanceCollection {
 			}
 		}
 		return curArray;
+	}
+
+	@Override
+	public Iterator<NetworkInstance> iterator() {
+		return networkInstances.iterator();
 	}
 	
 	@Override

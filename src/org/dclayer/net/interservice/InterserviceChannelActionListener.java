@@ -1,11 +1,10 @@
 package org.dclayer.net.interservice;
 
-import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkNode;
+import org.dclayer.net.network.slot.NetworkSlot;
 
 public interface InterserviceChannelActionListener {
 	public void onReadyChange(InterserviceChannel interserviceChannel, boolean ready);
-	public void onInConnectionBaseChange(InterserviceChannel interserviceChannel, byte oldInConnectionBase, byte newInConnectionBase);
-	public NetworkInstance onRemoteNetworkJoin(InterserviceChannel interserviceChannel, NetworkNode networkNode);
-	public void onRemoteNetworkLeave(InterserviceChannel interserviceChannel, NetworkNode networkNode);
+	public void onNewRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode networkNode, NetworkSlot localNetworkSlot);
+	public void onRemoveRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode networkNode);
 }

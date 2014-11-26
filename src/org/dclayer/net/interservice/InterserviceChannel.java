@@ -8,14 +8,13 @@ import org.dclayer.crypto.challenge.Fixed128ByteCryptoChallenge;
 import org.dclayer.crypto.key.Key;
 import org.dclayer.crypto.key.KeyPair;
 import org.dclayer.crypto.key.RSAKey;
-import org.dclayer.datastructure.map.Int2Map;
 import org.dclayer.exception.crypto.CryptoException;
 import org.dclayer.exception.crypto.InsufficientKeySizeException;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
-import org.dclayer.net.address.AsymmetricKeyPairAddress;
+import org.dclayer.net.address.Address;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.interservice.message.ConnectionbaseNoticeInterserviceMessage;
 import org.dclayer.net.interservice.message.CryptoChallengeReplyInterserviceMessage;
@@ -34,10 +33,11 @@ import org.dclayer.net.interservice.message.VersionInterserviceMessage;
 import org.dclayer.net.link.channel.data.ThreadDataChannel;
 import org.dclayer.net.llacache.CachedLLA;
 import org.dclayer.net.llacache.LLA;
-import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
+import org.dclayer.net.network.slot.AddressSlot;
+import org.dclayer.net.network.slot.AddressSlotMap;
 import org.dclayer.net.network.slot.NetworkSlot;
 import org.dclayer.net.network.slot.NetworkSlotMap;
 
@@ -45,40 +45,15 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	
 	public static long VERSION = 0;
 	
-	public static int ACTION_IDLE = 0;
-	/**
-	 * action code for applying for the trusted connection base
-	 * (i.e. having sent a {@link TrustedSwitchInterserviceMessage} but not yet having received a {@link ConnectionbaseNoticeInterserviceMessage})
-	 */
-	public static int ACTION_TRUSTED_SWITCH = 0;
-	
 	public static byte CONNECTIONBASE_STRANGER = 0;
 	public static byte CONNECTIONBASE_TRUSTED = 1;
 	
 	//
 	
-	private int action = ACTION_IDLE;
-	
 	private boolean initiator = false;
 	private long version = -1;
 	
 	private boolean ready = false;
-	
-	/**
-	 * connection base for incoming messages, i.e. how much we trust the remote
-	 */
-	private byte inConnectionBase = CONNECTIONBASE_STRANGER;
-	
-	/**
-	 * connection base for outgoing messages, i.e. how much the remote trusts us
-	 */
-	private byte outConnectionBase = CONNECTIONBASE_STRANGER;
-	
-	/**
-	 * connection base limit for outgoing messages, don't perform any actions caused by
-	 * a connection base notice received from the remote reporting a higher connection base
-	 */
-	private byte maxAllowedOutConnectionBase = CONNECTIONBASE_STRANGER;
 	
 	private InterservicePacket inInterservicePacket = new InterservicePacket(this);
 	private InterservicePacket outInterservicePacket = new InterservicePacket(this);
@@ -86,33 +61,18 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	private DCLService dclService;
 	private InterserviceChannelActionListener interserviceChannelActionListener;
 	private CachedLLA cachedLLA;
-	private AsymmetricKeyPairAddress<RSAKey> asymmetricKeyPairAddress;
 	
-	private AsymmetricKeyPairAddress trustedRemoteAddress;
+	private AddressSlotMap remoteAddressSlotMap = new AddressSlotMap(this, true);
+	private AddressSlotMap localAddressSlotMap = new AddressSlotMap(this, false);
 	
 	private NetworkSlotMap remoteNetworkSlotMap = new NetworkSlotMap();
 	private NetworkSlotMap localNetworkSlotMap = new NetworkSlotMap();
-	
-	private Int2Map remoteAPBRSlotMap = new Int2Map();
-	
-	/**
-	 * {@link CryptoChallenge} object used to solve crypto challenges requested by the remote
-	 */
-	private CryptoChallenge inCryptoChallenge;
-	
-	/**
-	 * {@link CryptoChallenge} object used to challenge the remote in order to confirm address possession
-	 */
-	private CryptoChallenge trustedSwitchOutCryptoChallenge;
 
-	public InterserviceChannel(DCLService dclService, InterserviceChannelActionListener interserviceChannelActionListener, CachedLLA cachedLLA, AsymmetricKeyPairAddress<RSAKey> asymmetricKeyPairAddress, long channelId, String channelName) {
+	public InterserviceChannel(DCLService dclService, InterserviceChannelActionListener interserviceChannelActionListener, CachedLLA cachedLLA, long channelId, String channelName) {
 		super(cachedLLA.getLink(), channelId, channelName);
 		this.dclService = dclService;
 		this.interserviceChannelActionListener = interserviceChannelActionListener;
 		this.cachedLLA = cachedLLA;
-		this.asymmetricKeyPairAddress = asymmetricKeyPairAddress;
-		
-		this.inCryptoChallenge = new Fixed128ByteCryptoChallenge(asymmetricKeyPairAddress.getKeyPair().getPrivateKey());
 	}
 	
 	public CachedLLA getCachedLLA() {
@@ -132,15 +92,90 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		}
 	}
 	
-	private void setMaxAllowedOutConnectionBase(byte maxAllowedOutConnectionBase) {
-		Log.debug(this, "updating maximum allowed outgoing connection base from %d to %d", this.maxAllowedOutConnectionBase, maxAllowedOutConnectionBase);
-		this.maxAllowedOutConnectionBase = maxAllowedOutConnectionBase;
+	private void removeRemoteAddressSlot(AddressSlot remoteAddressSlot) {
+		
+		for(NetworkSlot remoteNetworkSlot : remoteAddressSlot.getNetworkSlots()) {
+			
+			NetworkNode remoteNetworkNode = remoteNetworkSlot.removeNetworkNode(remoteAddressSlot.getAsymmetricKeyPairAddress());
+			interserviceChannelActionListener.onRemoveRemoteNetworkNode(this, remoteNetworkNode);
+			
+			checkRemoteNetworkSlot(remoteNetworkSlot);
+			
+		}
+		
+		remoteAddressSlotMap.remove(remoteAddressSlot.getSlot());
+		
 	}
 	
-	public void startTrustedSwitch() {
-		setAction(ACTION_TRUSTED_SWITCH);
-		setMaxAllowedOutConnectionBase(CONNECTIONBASE_TRUSTED);
-		sendTrustedSwitch(asymmetricKeyPairAddress.getKeyPair().getPublicKey());
+	private void removeRemoteNetworkSlot(NetworkSlot remoteNetworkSlot) {
+		
+		for(NetworkNode remoteNetworkNode : remoteNetworkSlot.getNetworkNodes()) {
+			
+			AddressSlot remoteAddressSlot = remoteAddressSlotMap.find(remoteNetworkNode.getAddress());
+			remoteAddressSlot.removeNetworkSlot(remoteNetworkSlot);
+			
+			interserviceChannelActionListener.onRemoveRemoteNetworkNode(this, remoteNetworkNode);
+			
+		}
+		
+		NetworkSlot localNetworkSlot = remoteNetworkSlot.getRemoteEquivalent();
+		if(localNetworkSlot != null) {
+			remoteNetworkSlot.setRemoteEquivalent(null);
+			localNetworkSlot.setRemoteEquivalent(null);
+		}
+		
+		remoteNetworkSlotMap.remove(remoteNetworkSlot.getSlot());
+		
+	}
+	
+	private void checkRemoteNetworkSlot(NetworkSlot remoteNetworkSlot) {
+		
+		if(remoteNetworkSlot.getNetworkNodes().size() <= 0) {
+			
+			Log.msg(this, "remote network slot %s is empty, removing", remoteNetworkSlot);
+			
+			NetworkSlot localNetworkSlot = remoteNetworkSlot.getRemoteEquivalent();
+			if(localNetworkSlot != null) {
+				remoteNetworkSlot.setRemoteEquivalent(null);
+				localNetworkSlot.setRemoteEquivalent(null);
+			}
+			
+			remoteNetworkSlotMap.remove(remoteNetworkSlot.getSlot());
+			
+		}
+		
+	}
+	
+	public void startTrustedSwitchOnAllAddressSlots() {
+		Log.debug(this, "starting trusted switch on all (%d) address slots", localAddressSlotMap.size());
+		for(AddressSlot addressSlot : localAddressSlotMap) {
+			startTrustedSwitch(addressSlot);
+		}
+	}
+	
+	public void startTrustedSwitch(AddressSlot addressSlot) {
+		Log.debug(this, "starting trusted switch on address slot: %s", addressSlot);
+		addressSlot.setMaxAllowedOutConnectionBase(CONNECTIONBASE_TRUSTED);
+		KeyPair keyPair = addressSlot.getAsymmetricKeyPairAddress().getKeyPair();
+		addressSlot.setInCryptoChallenge(new Fixed128ByteCryptoChallenge(keyPair.getPrivateKey()));
+		sendTrustedSwitch(addressSlot, (RSAKey) keyPair.getPublicKey());
+	}
+	
+	private void cancelTrustedSwitch(AddressSlot addressSlot) {
+		Log.debug(this, "cancelling trusted switch on address slot: %s", addressSlot);
+		addressSlot.setMaxAllowedOutConnectionBase(CONNECTIONBASE_STRANGER);
+		addressSlot.setInCryptoChallenge(null);
+	}
+	
+	private void finishTrustedSwitch(AddressSlot addressSlot, boolean success) {
+		if(success) {
+			Log.msg(this, "remote successfully completed crypto challenge for address slot: %s", addressSlot);
+			addressSlot.setTrustedSwitchOutCryptoChallenge(null);
+			addressSlot.setConnectionBase(CONNECTIONBASE_TRUSTED);
+		} else {
+			Log.msg(this, "remote failed crypto challenge for address slot, removing: %s", addressSlot);
+			removeRemoteAddressSlot(addressSlot);
+		}
 	}
 	
 	private void setVersion(long version) {
@@ -148,89 +183,94 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		this.version = version;
 	}
 	
-	private void setReady() {
+	private synchronized void setReady() {
 		Log.msg(this, "InterserviceChannel ready%s, version %d", this.ready ? " (was ready before)" : "", this.version);
 		if(this.ready) return;
 		this.ready = true;
 		this.interserviceChannelActionListener.onReadyChange(this, ready);
+		for(AddressSlot addressSlot : localAddressSlotMap) {
+			startTrustedSwitch(addressSlot);
+		}
 	}
 	
 	public boolean isReady() {
 		return ready;
 	}
 	
-	private void setAction(int action) {
-		Log.debug(this, "setting action from %d to %d", this.action, action);
-		this.action = action;
-	}
-	
-	private void setInConnectionBase(byte inConnectionBase) {
-		Log.msg(this, "setting incoming connection base from %d to %d", this.inConnectionBase, inConnectionBase);
-		byte oldInConnectionBase = this.inConnectionBase;
-		this.inConnectionBase = inConnectionBase;
-		if(oldInConnectionBase != inConnectionBase) {
-			this.interserviceChannelActionListener.onInConnectionBaseChange(this, oldInConnectionBase, inConnectionBase);
-		}
-	}
-	
 	/**
 	 * called when the remote notifies us of its incoming connection base
 	 * @param connectionBase the incoming connection base of the remote
 	 */
-	private void setOutConnectionBase(byte outConnectionBase) {
-		byte oldOutConnectionBase = this.outConnectionBase;
-		Log.msg(this, "setting outgoing connection base from %d to %d", oldOutConnectionBase, outConnectionBase);
-		this.outConnectionBase = outConnectionBase;
+	private void setOutConnectionBase(AddressSlot addressSlot, byte outConnectionBase) {
+		byte oldOutConnectionBase = addressSlot.getConnectionBase();
+		addressSlot.setOutConnectionBase(outConnectionBase);
 		
-		if(outConnectionBase > this.maxAllowedOutConnectionBase) {
-			Log.msg(this, "limiting new outgoing connection base %d down to maximum allowed outgoing connection base %d", outConnectionBase, this.maxAllowedOutConnectionBase);
-			outConnectionBase = this.maxAllowedOutConnectionBase;
-		}
-		
-		if(oldOutConnectionBase < CONNECTIONBASE_TRUSTED && outConnectionBase >= CONNECTIONBASE_TRUSTED) {
-			sendInitialNetworkJoinNotices();
+		if(oldOutConnectionBase < CONNECTIONBASE_TRUSTED && addressSlot.getConnectionBase() >= CONNECTIONBASE_TRUSTED) {
+			joinNetworks(addressSlot);
 		}
 	}
 	
-	private synchronized void sendInitialNetworkJoinNotices() {
-		NetworkNode[] networkNodes = this.asymmetricKeyPairAddress.getNetworkInstanceCollection().copyArray();
-		Log.msg(this, "sending initial network join notices (%d)", networkNodes.length);
+	private synchronized void joinNetworks(AddressSlot addressSlot) {
+		List<NetworkNode> networkNodes = addressSlot.popNetworkNodesToJoin();
+		Log.msg(this, "initially joining %d networks for address slot: %s", networkNodes.size(), addressSlot);
 		for(NetworkNode networkNode : networkNodes) {
-			joinNetwork(networkNode);
+			joinNetwork(addressSlot, networkNode);
 		}
-	}
-	
-	private void joinedNetwork(NetworkSlot networkSlot) {
-		Log.msg(this, "joining network %s: slot %s", networkSlot.getNetworkNode().getNetworkType(), networkSlot);
-		sendNetworkJoinNotice(networkSlot.getNetworkNode().getNetworkType(), networkSlot.getSlot());
 	}
 	
 	public synchronized void joinNetwork(NetworkNode networkNode) {
 		
-		NetworkSlot networkSlot = localNetworkSlotMap.add(networkNode);
+		AddressSlot addressSlot = localAddressSlotMap.find(networkNode.getAddress());
 		
-		NetworkSlot remoteNetworkSlot = remoteNetworkSlotMap.find(networkNode.getNetworkType());
+		if(addressSlot == null) {
+			addressSlot = localAddressSlotMap.add(networkNode.getAddress());
+			if(isReady()) {
+				startTrustedSwitch(addressSlot);
+			}
+		}
 		
-		networkSlot.setRemoteEquivalent(remoteNetworkSlot);
-		if(remoteNetworkSlot != null) remoteNetworkSlot.setRemoteEquivalent(networkSlot);
+		// if this address slot is not ready for joining networks yet, remember
+		// this node for joining it later
+		if(addressSlot.getConnectionBase() < CONNECTIONBASE_TRUSTED) {
+			addressSlot.addNetworkNodeToJoin(networkNode);
+			return;
+		}
 		
-		joinedNetwork(networkSlot);
+		// else, just join it
+		joinNetwork(addressSlot, networkNode);
 		
 	}
 	
-	private void setTrustedRemoteAddress(Key publicKey) {
-		// TODO type safety
-		AsymmetricKeyPairAddress address = new AsymmetricKeyPairAddress<>(KeyPair.fromPublicKey(publicKey));
-		Log.msg(this, "setting trusted remote address: %s", address);
-		this.trustedRemoteAddress = address;
-	}
-	
-	public AsymmetricKeyPairAddress getTrustedRemoteAddress() {
-		return trustedRemoteAddress;
-	}
-	
-	public AsymmetricKeyPairAddress<RSAKey> getLocalAddress() {
-		return asymmetricKeyPairAddress;
+	private synchronized void joinNetwork(AddressSlot addressSlot, NetworkNode networkNode) {
+		
+		if(addressSlot.getConnectionBase() < CONNECTIONBASE_TRUSTED) {
+			
+			Log.debug(this, "saving network node %s for later joining with address slot: %s", networkNode, addressSlot);
+			addressSlot.addNetworkNodeToJoin(networkNode);
+			return;
+			
+		}
+		
+		NetworkSlot networkSlot = localNetworkSlotMap.find(networkNode.getNetworkType());
+		
+		boolean newSlot = (networkSlot == null);
+		
+		if(newSlot) {
+			
+			networkSlot = localNetworkSlotMap.add(networkNode.getNetworkType());
+			
+			NetworkSlot remoteNetworkSlot = remoteNetworkSlotMap.find(networkNode.getNetworkType());
+			networkSlot.setRemoteEquivalent(remoteNetworkSlot);
+			if(remoteNetworkSlot != null) remoteNetworkSlot.setRemoteEquivalent(networkSlot);
+			
+		}
+		
+		networkSlot.addNetworkNode(networkNode);
+		
+		Log.debug(this, "joining %s network slot %s: %s", newSlot ? "new" : "existing", networkSlot, addressSlot);
+		
+		sendNetworkJoinNotice(addressSlot.getSlot(), newSlot ? networkSlot.getNetworkType() : null, networkSlot.getSlot());
+		
 	}
 
 	@Override
@@ -287,47 +327,44 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		sendOutInterservicePacket();
 	}
 	
-	private synchronized void sendTrustedSwitch(RSAKey rsaKey) {
-		Log.debug(this, "sending trusted switch message");
-		outInterservicePacket
-		.setTrustedSwitchInterserviceMessage()
-		.getKeyComponent()
-		.setRSAKeyComponent()
-		.setKey(rsaKey);
+	private synchronized void sendTrustedSwitch(AddressSlot addressSlot, RSAKey rsaKey) {
+		Log.debug(this, "sending trusted switch message for address slot: %s", addressSlot);
+		TrustedSwitchInterserviceMessage trustedSwitchInterserviceMessage = outInterservicePacket.setTrustedSwitchInterserviceMessage();
+		trustedSwitchInterserviceMessage.getKeyComponent().setRSAKeyComponent().setKey(rsaKey);
+		trustedSwitchInterserviceMessage.setAddressSlot(addressSlot.getSlot());
 		sendOutInterservicePacket();
 	}
 	
-	private synchronized void sendCryptoChallengeRequest(Data plainData) {
+	private synchronized void sendCryptoChallengeRequest(AddressSlot addressSlot, Data plainData) {
 		Log.debug(this, "sending crypto challenge request");
-		outInterservicePacket
-		.setCryptoChallengeRequestInterserviceMessage()
-		.getDataComponent()
-		.setData(plainData);
+		CryptoChallengeRequestInterserviceMessage cryptoChallengeRequestInterserviceMessage = outInterservicePacket.setCryptoChallengeRequestInterserviceMessage();
+		cryptoChallengeRequestInterserviceMessage.setAddressSlot(addressSlot.getSlot());
+		cryptoChallengeRequestInterserviceMessage.getDataComponent().setData(plainData);
 		sendOutInterservicePacket();
 	}
 	
-	private synchronized void sendCryptoChallengeReply(Data cipherData) {
+	private synchronized void sendCryptoChallengeReply(AddressSlot addressSlot, Data cipherData) {
 		Log.debug(this, "sending crypto challenge reply");
-		outInterservicePacket
-		.setCryptoChallengeReplyInterserviceMessage()
-		.getDataComponent()
-		.setData(cipherData);
+		CryptoChallengeReplyInterserviceMessage cryptoChallengeReplyInterserviceMessage = outInterservicePacket.setCryptoChallengeReplyInterserviceMessage();
+		cryptoChallengeReplyInterserviceMessage.setAddressSlot(addressSlot.getSlot());
+		cryptoChallengeReplyInterserviceMessage.getDataComponent().setData(cipherData);
 		sendOutInterservicePacket();
 	}
 	
-	private synchronized void sendConnectionbaseNotice() {
-		Log.debug(this, "sending connection base notice: %d", inConnectionBase);
-		outInterservicePacket
-		.setConnectionbaseNoticeInterserviceMessage()
-		.setConnectionBase(inConnectionBase);
+	private synchronized void sendConnectionbaseNotice(AddressSlot addressSlot) {
+		Log.debug(this, "sending connection base notice for connection base %d on address slot: %s", addressSlot.getConnectionBase(), addressSlot);
+		ConnectionbaseNoticeInterserviceMessage connectionbaseNoticeInterserviceMessage = outInterservicePacket.setConnectionbaseNoticeInterserviceMessage();
+		connectionbaseNoticeInterserviceMessage.setAddressSlot(addressSlot.getSlot());
+		connectionbaseNoticeInterserviceMessage.setConnectionBase(addressSlot.getConnectionBase());
 		sendOutInterservicePacket();
 	}
 	
-	private synchronized void sendNetworkJoinNotice(NetworkType networkType, int slot) {
-		Log.debug(this, "sending network join notice for network type %s, slot %d", networkType, slot);
+	private synchronized void sendNetworkJoinNotice(int addressSlotId, NetworkType networkType, int networkSlotId) {
+		Log.debug(this, "sending network join notice for address slot id %d, network slot id %d and network type %s", addressSlotId, networkSlotId, networkType);
 		NetworkJoinNoticeInterserviceMessage networkJoinNoticeInterserviceMessage = outInterservicePacket.setNetworkJoinNoticeInterserviceMessage();
-		networkJoinNoticeInterserviceMessage.setNetworkType(networkType);
-		networkJoinNoticeInterserviceMessage.setSlot(slot);
+		networkJoinNoticeInterserviceMessage.setAddressSlot(addressSlotId);
+		networkJoinNoticeInterserviceMessage.setNetworkSlot(networkSlotId);
+		networkJoinNoticeInterserviceMessage.getNetworkTypeComponent().setNetworkType(networkType);
 		sendOutInterservicePacket();
 	}
 	
@@ -335,7 +372,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		Log.debug(this, "sending network leave notice for slot %d", slot);
 		outInterservicePacket
 		.setNetworkLeaveNoticeInterserviceMessage()
-		.setSlot(slot);
+		.setNetworkSlot(slot);
 		sendOutInterservicePacket();
 	}
 	
@@ -347,86 +384,89 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		sendOutInterservicePacket();
 	}
 	
-	private void onRemoteNetworkJoin(final NetworkSlot remoteNetworkSlot) {
+	private void onNetworkJoinNotice(AddressSlot remoteAddressSlot, final int networkSlotId, NetworkType networkType) {
 		
-		NetworkNode remoteNetworkNode = remoteNetworkSlot.getNetworkNode();
-
-		int slot = remoteNetworkSlot.getSlot();
-		Data addressData = remoteNetworkNode.getScaledAddress();
-		
-		Log.msg(this, "remote joined network %s, slot %d", remoteNetworkNode, slot);
-		
-		NetworkSlot localNetworkSlot = localNetworkSlotMap.find(remoteNetworkNode.getNetworkType());
-		
-		NetworkInstance localNetworkInstance = interserviceChannelActionListener.onRemoteNetworkJoin(this, remoteNetworkNode);
-		if(localNetworkSlot == null && localNetworkInstance != null) {
-			// let's join that network
-			synchronized(this) {
-				if(outConnectionBase >= CONNECTIONBASE_TRUSTED) {
-					localNetworkSlot = localNetworkSlotMap.add(localNetworkInstance);
-					joinedNetwork(localNetworkSlot);
-				} else {
-					startTrustedSwitch();
-				}
-			}
+		if(remoteAddressSlot.getConnectionBase() < CONNECTIONBASE_TRUSTED) {
+			Log.msg(this, "ignoring network join notice on address slot (incoming connection base insufficient): %s", remoteAddressSlot);
+			return;
 		}
+		
+		NetworkSlot remoteNetworkSlot = remoteNetworkSlotMap.get(networkSlotId);
+		
+		boolean existing = remoteNetworkSlot != null;
+		
+		if(existing) {
+			
+			if(networkType == null) {
+				
+				networkType = remoteNetworkSlot.getNetworkType();
+				
+			} else if(!remoteNetworkSlot.getNetworkType().equals(networkType)) {
+				
+				Log.warning(this, "received network join notice for address slot %s joining network slot %s where network slot's network type (%s) does not equal (surprisingly) given network type of network join notice (%s), emptying existing network slot first", remoteAddressSlot, remoteNetworkSlot, remoteNetworkSlot.getNetworkType(), networkType);
+				removeRemoteNetworkSlot(remoteNetworkSlot);
+				remoteNetworkSlot = remoteNetworkSlotMap.put(networkSlotId, networkType);
+				
+			}
+			
+		} else {
+			
+			if(networkType == null) {
+				Log.msg(this, "ignoring network join notice for empty network slot id %d, network type is not given", networkSlotId);
+				return;
+			}
+			
+			remoteNetworkSlot = remoteNetworkSlotMap.put(networkSlotId, networkType);
+			
+		}
+		
+		NetworkNode remoteNetworkNode = new NetworkNode(networkType, remoteAddressSlot.getAsymmetricKeyPairAddress()) {
+			@Override
+			public boolean onForward(NetworkPacket networkPacket) {
+				sendNetworkPacket(networkPacket, networkSlotId);
+				return true;
+			}
+		};
+		
+		remoteNetworkSlot.addNetworkNode(remoteNetworkNode);
+		
+		remoteAddressSlot.addNetworkSlot(remoteNetworkSlot);
+		
+		Log.msg(this, "remote joined network %s with address slot %s, network node: %s", remoteNetworkSlot, remoteAddressSlot, remoteNetworkNode);
+		
+		NetworkSlot localNetworkSlot = localNetworkSlotMap.find(remoteNetworkSlot.getNetworkType());
+		
+		interserviceChannelActionListener.onNewRemoteNetworkNode(this, remoteNetworkNode, localNetworkSlot);
 		
 		remoteNetworkSlot.setRemoteEquivalent(localNetworkSlot);
 		if(localNetworkSlot != null) localNetworkSlot.setRemoteEquivalent(remoteNetworkSlot);
 		
 	}
 	
-	private void onRemoteNetworkLeave(NetworkSlot remoteNetworkSlot) {
+	private void onNetworkLeaveNotice(AddressSlot remoteAddressSlot, int remoteNetworkSlotId) {
 		
-		NetworkNode remoteNetworkNode = remoteNetworkSlot.getNetworkNode();
-		Data addressData = remoteNetworkNode.getScaledAddress();
-		int slot = remoteNetworkSlot.getSlot();
-		
-		Log.msg(this, "remote left network %s (slot %d, address %s)", remoteNetworkNode, slot, addressData);
-		
-		NetworkSlot localNetworkSlot = remoteNetworkSlot.getRemoteEquivalent();
-		if(localNetworkSlot != null) {
-			remoteNetworkSlot.setRemoteEquivalent(null);
-			localNetworkSlot.setRemoteEquivalent(null);
-		}
-		
-		interserviceChannelActionListener.onRemoteNetworkLeave(this, remoteNetworkNode);
-		
-	}
-	
-	private void onNetworkJoinNotice(NetworkType networkType, final int slot) {
-		
-		NetworkSlot remoteNetworkSlot = remoteNetworkSlotMap.get(slot);
-		if(remoteNetworkSlot != null) {
-			onRemoteNetworkLeave(remoteNetworkSlot);
-		}
-		
-		NetworkNode remoteNetworkNode = new NetworkNode(networkType, trustedRemoteAddress) {
-			@Override
-			public boolean onForward(NetworkPacket networkPacket) {
-				sendNetworkPacket(networkPacket, slot);
-				return true;
-			}
-		};
-		
-		remoteNetworkSlot = remoteNetworkSlotMap.put(slot, remoteNetworkNode);
-		
-		onRemoteNetworkJoin(remoteNetworkSlot);
-		
-	}
-	
-	private void onNetworkLeaveNotice(int slot) {
-		NetworkSlot remoteNetworkSlot = remoteNetworkSlotMap.remove(slot);
+		NetworkSlot remoteNetworkSlot = remoteNetworkSlotMap.get(remoteNetworkSlotId);
 		
 		if(remoteNetworkSlot == null) {
-			
-			Log.warning(this, "remote left empty network type slot %d", slot);
-			
-		} else {
-			
-			onRemoteNetworkLeave(remoteNetworkSlot);
-			
+			Log.warning(this, "remote left nonexistent network type slot %d with address slot: %s", remoteNetworkSlotId, remoteAddressSlot);
+			return;
 		}
+		
+		NetworkNode remoteNetworkNode = remoteNetworkSlot.removeNetworkNode(remoteAddressSlot.getAsymmetricKeyPairAddress());
+		
+		if(remoteNetworkNode == null) {
+			Log.warning(this, "remote left network slot %s which it did not join with address slot: %s", remoteNetworkSlot, remoteAddressSlot);
+			return;
+		}
+		
+		remoteAddressSlot.removeNetworkSlot(remoteNetworkSlot);
+		
+		Log.msg(this, "remote left network %s, network slot %s with address slot: %s", remoteNetworkNode, remoteNetworkSlot, remoteAddressSlot);
+		
+		checkRemoteNetworkSlot(remoteNetworkSlot);
+		
+		interserviceChannelActionListener.onRemoveRemoteNetworkNode(this, remoteNetworkNode);
+		
 	}
 	
 	private void onReceiveNetworkPacket(NetworkPacket networkPacket) {
@@ -438,7 +478,8 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 			return;
 		}
 		
-		if(!localNetworkSlot.getNetworkNode().forward(networkPacket)) {
+		// just forward this to the first node as their routing tables are connected anyways
+		if(!localNetworkSlot.getNetworkNodes().get(0).forward(networkPacket)) {
 			// TODO: could not route, maybe notify remote?
 		}
 		
@@ -494,40 +535,63 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	
 	public synchronized void onReceiveTrustedSwitchInterserviceMessage(TrustedSwitchInterserviceMessage trustedSwitchInterserviceMessage) {
 		
-		Log.debug(this, "received trusted switch");
-		
-		if(trustedSwitchOutCryptoChallenge != null) {
-			Log.msg(this, "ignoring trusted switch, already challenging the remote");
-			// TODO notify remote of failure
-			return;
-		}
+		int addressSlotId = trustedSwitchInterserviceMessage.getAddressSlot();
 		
 		Key key;
 		try {
 			key = trustedSwitchInterserviceMessage.getKeyComponent().getKeyComponent().getKey();
 		} catch (InsufficientKeySizeException e) {
-			Log.exception(this, e);
+			Log.exception(this, e, "could not parse trusted switch message for address slot %d, insufficient key size", addressSlotId);
 			// TODO notify remote of failure
 			return;
 		}
 		
-		this.trustedSwitchOutCryptoChallenge = new Fixed128ByteCryptoChallenge(key);
+		Address remoteAddress = new Address<>(KeyPair.fromPublicKey(key));
+		
+		AddressSlot addressSlot = remoteAddressSlotMap.get(addressSlotId);
+		
+		if(addressSlot != null) {
+			if(addressSlot.getAsymmetricKeyPairAddress().equals(remoteAddress)) {
+				Log.msg(this, "ignoring trusted switch message for address slot (slot already exists with same address): %s", addressSlot);
+				return;
+			} else {
+				Log.msg(this, "received trusted switch message for existing slot with different key, overwriting slot: %s", addressSlot);
+				removeRemoteAddressSlot(addressSlot);
+			}
+		}
+		
+		Log.debug(this, "received trusted switch message for address slot id %d with address: %s", addressSlotId, remoteAddress);
+		
+		addressSlot = remoteAddressSlotMap.put(addressSlotId, remoteAddress);
+		
+		CryptoChallenge trustedSwitchOutCryptoChallenge = new Fixed128ByteCryptoChallenge(key);
+		addressSlot.setTrustedSwitchOutCryptoChallenge(trustedSwitchOutCryptoChallenge);
 		
 		Data plainData = trustedSwitchOutCryptoChallenge.makeRandomPlainData();
-		
-		sendCryptoChallengeRequest(plainData);
+		sendCryptoChallengeRequest(addressSlot, plainData);
 		
 	}
 	
 	public synchronized void onReceiveCryptoChallengeRequestInterserviceMessage(CryptoChallengeRequestInterserviceMessage cryptoChallengeRequestInterserviceMessage) {
 		
-		Log.debug(this, "received crypto challenge request");
+		int addressSlotId = cryptoChallengeRequestInterserviceMessage.getAddressSlot();
+		AddressSlot addressSlot = localAddressSlotMap.get(addressSlotId);
 		
-		if(action != ACTION_TRUSTED_SWITCH) {
-			Log.msg(this, "ignoring crypto challenge request, not performing trusted switch");
-			// didn't request this
+		if(addressSlot == null) {
+			Log.msg(this, "received crypto challenge request for empty address slot %d, ignoring", addressSlotId);
 			return;
 		}
+		
+		CryptoChallenge inCryptoChallenge = addressSlot.getInCryptoChallenge();
+		
+		if(inCryptoChallenge == null) {
+			Log.msg(this, "ignoring crypto challenge request for address slot (not performing trusted switch): %s", addressSlot);
+			return;
+		}
+		
+		addressSlot.setInCryptoChallenge(null);
+		
+		Log.debug(this, "received crypto challenge request for address slot: %s", addressSlot);
 		
 		Data plainData = cryptoChallengeRequestInterserviceMessage.getDataComponent().getData();
 		
@@ -535,25 +599,34 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		try {
 			cipherData = inCryptoChallenge.solveCryptoChallenge(plainData);
 		} catch (CryptoException e) {
-			Log.exception(this, e);
-			setAction(ACTION_IDLE);
+			Log.exception(this, e, "could not solve crypto challenge for address slot: %s", addressSlot);
+			cancelTrustedSwitch(addressSlot);
 			// TODO notify remote of failure
 			return;
 		}
 		
-		sendCryptoChallengeReply(cipherData);
+		sendCryptoChallengeReply(addressSlot, cipherData);
 		
 	}
 	
 	public synchronized void onReceiveCryptoChallengeReplyInterserviceMessage(CryptoChallengeReplyInterserviceMessage cryptoChallengeReplyInterserviceMessage) {
 		
-		Log.debug(this, "received crypto challenge reply");
+		int addressSlotId = cryptoChallengeReplyInterserviceMessage.getAddressSlot();
+		AddressSlot addressSlot = remoteAddressSlotMap.get(addressSlotId);
 		
-		if(trustedSwitchOutCryptoChallenge == null) {
-			Log.msg(this, "ignoring crypto challenge reply, didn't challenge the remote");
-			// didn't see a trusted switch message before
+		if(addressSlot == null) {
+			Log.msg(this, "received crypto challenge reply for empty address slot %d, ignoring", addressSlotId);
 			return;
 		}
+		
+		CryptoChallenge trustedSwitchOutCryptoChallenge = addressSlot.getTrustedSwitchOutCryptoChallenge();
+		
+		if(trustedSwitchOutCryptoChallenge == null) {
+			Log.msg(this, "ignoring crypto challenge reply for address slot (didn't challenge the remote): %s", addressSlot);
+			return;
+		}
+		
+		Log.debug(this, "received crypto challenge reply for address slot: %s", addressSlot);
 		
 		Data cipherData = cryptoChallengeReplyInterserviceMessage.getDataComponent().getData();
 		
@@ -561,56 +634,78 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		try {
 			success = trustedSwitchOutCryptoChallenge.verifyCipherData(cipherData);
 		} catch (CryptoException e) {
-			Log.exception(this, e);
+			Log.exception(this, e, "could not verify crypto challenge reply for address slot: %s", addressSlot);
 			// TODO notify remote of failure
 			return;
 		}
 		
-		if(success) {
-			setTrustedRemoteAddress(this.trustedSwitchOutCryptoChallenge.getKey());
-			setInConnectionBase(CONNECTIONBASE_TRUSTED);
-		}
+		finishTrustedSwitch(addressSlot, success);
 		
-		this.trustedSwitchOutCryptoChallenge = null;
-		
-		sendConnectionbaseNotice();
+		sendConnectionbaseNotice(addressSlot);
 		
 	}
 	
 	public void onReceiveConnectionbaseNoticeInterserviceMessage(ConnectionbaseNoticeInterserviceMessage connectionbaseNoticeInterserviceMessage) {
-		
+
 		byte outConnectionBase = connectionbaseNoticeInterserviceMessage.getConnectionBase();
-		Log.debug(this, "received connection base notice from remote, connection base: %d", outConnectionBase);
-		setOutConnectionBase(outConnectionBase);
+		
+		int addressSlotId = connectionbaseNoticeInterserviceMessage.getAddressSlot();
+		AddressSlot addressSlot = localAddressSlotMap.get(addressSlotId);
+		
+		if(addressSlot == null) {
+			Log.msg(this, "ignoring connection base notice message for empty address slot %d (connection base %d)", addressSlotId, outConnectionBase);
+			return;
+		}
+		
+		Log.debug(this, "received connection base notice message from remote, connection base %d for address slot: %s", outConnectionBase, addressSlot);
+		setOutConnectionBase(addressSlot, outConnectionBase);
 		
 	}
 	
 	public void onReceiveNetworkJoinNoticeInterserviceMessage(NetworkJoinNoticeInterserviceMessage networkJoinNoticeInterserviceMessage) {
+
+		int addressSlotId = networkJoinNoticeInterserviceMessage.getAddressSlot();
+		int networkSlotId = networkJoinNoticeInterserviceMessage.getNetworkSlot();
+		NetworkType networkType = networkJoinNoticeInterserviceMessage.getNetworkTypeComponent().getNetworkType();
 		
-		NetworkType networkType = networkJoinNoticeInterserviceMessage.getNetworkType();
-		int slot = networkJoinNoticeInterserviceMessage.getSlot();
-		Log.debug(this, "received network join notice for network: %s", networkType);
+		AddressSlot addressSlot = remoteAddressSlotMap.get(addressSlotId);
 		
-		if(inConnectionBase < CONNECTIONBASE_TRUSTED) {
-			Log.msg(this, "ignoring network join notice, incoming connection base insufficient");
+		if(addressSlot == null) {
+			Log.msg(this, "ignoring network join notice for empty address slot id %d, network slot id is %d, network type is: %s", addressSlotId, networkSlotId, networkType);
 			return;
 		}
 		
-		onNetworkJoinNotice(networkType, slot);
+		if(addressSlot.getConnectionBase() < CONNECTIONBASE_TRUSTED) {
+			Log.msg(this, "ignoring network join notice for network slot id %d, network type %s and address slot (incoming connection base insufficient): %s", networkSlotId, networkType, addressSlot);
+			return;
+		}
+		
+		Log.debug(this, "received network join notice for network type %s and network slot id %d on address slot: %s", networkType, networkSlotId, addressSlot);
+
+		onNetworkJoinNotice(addressSlot, networkSlotId, networkType);
 		
 	}
 	
 	public void onReceiveNetworkLeaveNoticeInterserviceMessage(NetworkLeaveNoticeInterserviceMessage networkLeaveNoticeInterserviceMessage) {
 		
-		int slot = networkLeaveNoticeInterserviceMessage.getSlot();
-		Log.debug(this, "received network leave notice for slot: %d", slot);
+		int addressSlotId = networkLeaveNoticeInterserviceMessage.getAddressSlot();
+		int networkSlotId = networkLeaveNoticeInterserviceMessage.getNetworkSlot();
 		
-		if(inConnectionBase < CONNECTIONBASE_TRUSTED) {
-			Log.msg(this, "ignoring network leave notice, incoming connection base insufficient");
+		AddressSlot addressSlot = remoteAddressSlotMap.get(addressSlotId);
+		
+		if(addressSlot == null) {
+			Log.msg(this, "ignoring network leave notice for empty address slot id %d, network slot id is %d", addressSlotId, networkSlotId);
 			return;
 		}
 		
-		onNetworkLeaveNotice(slot);
+		if(addressSlot.getConnectionBase() < CONNECTIONBASE_TRUSTED) {
+			Log.msg(this, "ignoring network leave notice for address slot (incoming connection base insufficient): %s", addressSlot);
+			return;
+		}
+		
+		Log.debug(this, "received network leave notice for address slot %s, network slot id %d", addressSlot, networkSlotId);
+		
+		onNetworkLeaveNotice(addressSlot, networkSlotId);
 		
 	}
 	
@@ -631,15 +726,17 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	}
 	
 	public void onReceiveNetworkPacketInterserviceMessage(NetworkPacketInterserviceMessage networkPacketInterserviceMessage) {
+
+		NetworkPacket networkPacket = networkPacketInterserviceMessage.getNetworkPacket();
 		
-		if(inConnectionBase < CONNECTIONBASE_TRUSTED) {
-			Log.msg(this, "ignoring network packet, incoming connection base insufficient");
+		if(networkPacket.getNetworkSlot().getNetworkNodes().size() <= 0) {
+			Log.msg(this, "ignoring network packet, no network nodes on network slot %s", networkPacket.getNetworkSlot());
 			return;
 		}
 		
-		NetworkPacket networkPacket = networkPacketInterserviceMessage.getNetworkPacket();
-		Log.debug(this, "received network packet on slot %d: %s", networkPacketInterserviceMessage.getSlot(), networkPacket);
+		Log.debug(this, "received network packet on slot %s: %s", networkPacket.getNetworkSlot(), networkPacket);
 		onReceiveNetworkPacket(networkPacket);
+		
 	}
 
 	@Override

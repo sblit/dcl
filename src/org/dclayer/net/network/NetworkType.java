@@ -1,7 +1,6 @@
 package org.dclayer.net.network;
 
 import org.dclayer.exception.net.buf.BufException;
-import org.dclayer.exception.net.parse.MalformedNetworkDescriptorException;
 import org.dclayer.exception.net.parse.NotImplementedParseException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.exception.net.parse.UnsupportedNetworkIdentifierException;
@@ -25,9 +24,8 @@ public abstract class NetworkType<T extends NetworkType> extends PacketComponent
 	public static NetworkType fromByteBuf(ByteBuf byteBuf) throws BufException, ParseException {
 		String descriptor = byteBuf.readString();
 		String[] parts = descriptor.split(" ", 2);
-		if(parts.length < 2) throw new MalformedNetworkDescriptorException(descriptor);
 		String identifier = parts[0];
-		String attributeString = parts[1];
+		String attributeString = parts.length > 1 ? parts[1] : "";
 		return make(identifier, attributeString);
 	}
 	

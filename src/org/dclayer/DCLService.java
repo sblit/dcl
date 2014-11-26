@@ -5,6 +5,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.util.LinkedList;
 import java.util.List;
 
 import org.dclayer.PreLinkCommunicationManager.Result;
@@ -18,7 +19,6 @@ import org.dclayer.net.Data;
 import org.dclayer.net.a2s.ApplicationConnection;
 import org.dclayer.net.a2s.ApplicationConnectionActionListener;
 import org.dclayer.net.address.Address;
-import org.dclayer.net.address.AsymmetricKeyPairAddress;
 import org.dclayer.net.buf.DataByteBuf;
 import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.interservice.InterserviceChannelActionListener;
@@ -37,6 +37,8 @@ import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.routing.RoutingTable;
+import org.dclayer.net.network.slot.AddressSlot;
+import org.dclayer.net.network.slot.NetworkSlot;
 import org.dclayer.net.socket.TCPSocket;
 import org.dclayer.net.socket.UDPSocket;
 
@@ -54,13 +56,16 @@ public class DCLService implements OnReceiveListener, NetworkInstanceListener, A
 	private LLACache llaCache = new LLACache();
 	private LLADatabase llaDatabase;
 	
-	private AsymmetricKeyPairAddress localAddress;
+	private Address localAddress;
 	
 	private NetworkInstanceCollection networkInstanceCollection = new NetworkInstanceCollection();
 	
 	private PreLinkCommunicationManager preLinkCommunicationManager = new PreLinkCommunicationManager(this);
 	
 	private ConnectionInitiationManager connectionInitiationManager;
+	
+	private List<InterserviceChannel> interserviceChannels = new LinkedList<>();
+	private List<NetworkNode> networkNodes = new LinkedList<>();
 	
 	public DCLService(int s2sPort, int a2sPort, LLADatabase llaDatabase) throws IOException {
 		
@@ -69,7 +74,9 @@ public class DCLService implements OnReceiveListener, NetworkInstanceListener, A
 		Log.debug(this, "generating address RSA keypair...");
 		KeyPair addressKeyPair = Crypto.generateAddressRSAKeyPair();
 		Log.debug(this, "done, public key: %s (%d bits)", addressKeyPair.getPublicKey().toString(), addressKeyPair.getPublicKey().getNumBits());
-		this.localAddress = new AsymmetricKeyPairAddress<>(addressKeyPair, new NetworkInstanceCollection());
+		this.localAddress = new Address<>(addressKeyPair, new NetworkInstanceCollection());
+		
+		onAddress(localAddress);
 		
 		udpSocket = new UDPSocket(this, s2sPort, this);
 		tcpSocket = new TCPSocket(a2sPort, this);
@@ -78,7 +85,7 @@ public class DCLService implements OnReceiveListener, NetworkInstanceListener, A
 		
 	}
 	
-	public AsymmetricKeyPairAddress getServiceAPBRAddress() {
+	public Address getServiceAddress() {
 		return localAddress;
 	}
 	
@@ -113,44 +120,21 @@ public class DCLService implements OnReceiveListener, NetworkInstanceListener, A
 	}
 	
 	@Override
-	public void onNetworkInstance(NetworkInstance networkInstance) {
-		Log.msg(this, "onNetworkInstance: %s", networkInstance);
-		networkInstanceCollection.addNetworkInstance(networkInstance);
-	}
-	
-	@Override
 	public void onReadyChange(InterserviceChannel interserviceChannel, boolean ready) {
 		if(ready) {
 			CachedLLA cachedLLA = interserviceChannel.getCachedLLA();
 			cachedLLA.setStatus(CachedLLA.CONNECTED);
 			Log.debug(this, "interservice channel to LLA %s ready", cachedLLA);
-			
-			// TODO decide how to continue (just leave it here, prove an address or even request integration?)
-			
-			// for now, if we actively connected to that LLA, let's prove our address
-			if(interserviceChannel.isInitiator()) {
-				interserviceChannel.startTrustedSwitch();
-			}
 		}
 	}
 	
 	@Override
-	public void onInConnectionBaseChange(InterserviceChannel interserviceChannel, byte oldInConnectionBase, byte newInConnectionBase) {
-		if(newInConnectionBase >= InterserviceChannel.CONNECTIONBASE_TRUSTED) {
-			// TODO carry out appropriate actions (i.e. begin routing, etc.)
-		} else if(newInConnectionBase <= InterserviceChannel.CONNECTIONBASE_STRANGER) {
-			// TODO carry out appropriate actions (i.e. stop routing, etc.)
-		}
-	}
-	
-	@Override
-	public NetworkInstance onRemoteNetworkJoin(InterserviceChannel interserviceChannel, NetworkNode remoteNetworkNode) {
-		
-		Address localAddress = interserviceChannel.getLocalAddress();
+	public void onNewRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode remoteNetworkNode, NetworkSlot localNetworkSlot) {
 		
 		// TODO also check if we should maybe join that network
 		
-		NetworkInstance localNetworkInstance = localAddress.getNetworkInstanceCollection().findLocal(remoteNetworkNode.getNetworkType());
+		// just use the first network instance with the same network type (as they are all connected anyways)
+		NetworkInstance localNetworkInstance = networkInstanceCollection.findLocal(remoteNetworkNode.getNetworkType());
 		
 		if(localNetworkInstance != null) {
 			
@@ -158,25 +142,37 @@ public class DCLService implements OnReceiveListener, NetworkInstanceListener, A
 			boolean added = routingTable.add(remoteNetworkNode);
 			
 			if(added) {
+				
 				Log.debug(this, "added %s to routing table for %s", remoteNetworkNode, localNetworkInstance);
+				
 			}
 			
-			return added ? localNetworkInstance : null;
-			
 		}
-		
-		return null;
 		
 	}
 	
 	@Override
-	public void onRemoteNetworkLeave(InterserviceChannel interserviceChannel, NetworkNode networkNode) {
+	public void onRemoveRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode networkNode) {
 		// TODO remove route for that network and the remote's address
 	}
 	
 	@Override
 	public ApplicationConnection onApplicationConnection(Socket socket) {
 		return new ApplicationConnection(this, this, socket);
+	}
+	
+	@Override
+	public synchronized void onAddress(Address asymmetricKeyPairAddress) {
+		// do nothing (add AddressSlots when adding NetworkInstances)
+	}
+	
+	@Override
+	public synchronized void onNetworkInstance(NetworkInstance networkInstance) {
+		Log.msg(this, "onNetworkInstance: %s", networkInstance);
+		networkInstanceCollection.addNetworkInstance(networkInstance);
+		for(InterserviceChannel interserviceChannel : interserviceChannels) {
+			interserviceChannel.joinNetwork(networkInstance);
+		}
 	}
 	
 	@Override
@@ -274,7 +270,13 @@ public class DCLService implements OnReceiveListener, NetworkInstanceListener, A
 		switch(protocol) {
 		case "org.dclayer.interservice": {
 			cachedLLA.setStatus(CachedLLA.CONNECTING_CHANNEL);
-			InterserviceChannel interserviceChannel = new InterserviceChannel(this, this, cachedLLA, localAddress, channelId, protocol);
+			InterserviceChannel interserviceChannel = new InterserviceChannel(this, this, cachedLLA, channelId, protocol);
+			synchronized(this) {
+				interserviceChannels.add(interserviceChannel);
+				for(NetworkNode networkNode : networkInstanceCollection) {
+					interserviceChannel.joinNetwork(networkNode);
+				}
+			}
 			cachedLLA.setInterserviceChannel(interserviceChannel);
 			return interserviceChannel;
 		}

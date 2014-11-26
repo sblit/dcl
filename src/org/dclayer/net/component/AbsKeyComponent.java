@@ -3,8 +3,9 @@ package org.dclayer.net.component;
 import org.dclayer.crypto.key.Key;
 import org.dclayer.exception.crypto.InsufficientKeySizeException;
 import org.dclayer.net.PacketComponent;
+import org.dclayer.net.componentinterface.AbsKeyComponentI;
 
-public abstract class AbsKeyComponent extends PacketComponent {
+public abstract class AbsKeyComponent extends PacketComponent implements AbsKeyComponentI {
 	
 	public abstract byte getTypeId();
 	

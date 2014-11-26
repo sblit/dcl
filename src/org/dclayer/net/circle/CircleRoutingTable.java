@@ -6,6 +6,7 @@ import org.dclayer.datastructure.tree.ParentTreeNode;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
+import org.dclayer.net.address.Address;
 import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
@@ -109,7 +110,7 @@ public class CircleRoutingTable extends RoutingTable implements HierarchicalLeve
 	}
 
 	@Override
-	public Nexthops lookup(Data scaledDestinationAddress, Data scaledOriginAddress, int offset) {
+	public Nexthops lookup(Data scaledDestinationAddress, Address originAddress, int offset) {
 		
 		Nexthops nexthops = routes.getClosest(scaledDestinationAddress);
 		
@@ -117,9 +118,18 @@ public class CircleRoutingTable extends RoutingTable implements HierarchicalLeve
 			return null;
 		}
 		
-		if(scaledOriginAddress.equals(nexthops.getForwardDestination().getScaledAddress())) {
-			// do not forward to the scaled address we just got this from
-			return null;
+		for(ForwardDestination forwardDestination : nexthops) {
+			if(originAddress == forwardDestination.getAddress()) {
+				// do not forward the packet to the hop we just received this packet from
+				// do not forward the packet to any node with the same scaled address as ours
+				// note: if any forward destination in the list of nexthops has the same Address instance as originAddress,
+				//       this means that either:
+				//           1) that hop just routed the packet to us and we'd be loop-routing it back, or
+				//           2) that hop's got the same scaled address as us, was kind enough to also share the packet it
+				//              received with us and we'd be loop-routing it back (since we're also very nice and want to
+				//              share the packet with nodes that use the same scaled address).
+				return null;
+			}
 		}
 		
 		if(localNetworkInstance.getScaledAddress().equals(nexthops.getForwardDestination().getScaledAddress())) {

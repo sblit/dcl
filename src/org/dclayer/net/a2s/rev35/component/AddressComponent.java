@@ -4,10 +4,10 @@ import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
-import org.dclayer.net.a2s.rev35.Rev35PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.componentinterface.AddressComponentI;
 
-public class AddressComponent extends Rev35PacketComponent {
+public class AddressComponent extends PacketComponent implements AddressComponentI {
 	
 	private Data addressData;
 	private Data ownAddressData = new Data();

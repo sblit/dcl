@@ -9,11 +9,12 @@ import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.componentinterface.RSAKeyComponentI;
 
 /**
  * a {@link PacketComponent} containing data for the RSA crypto method
  */
-public class RSAKeyComponent extends AbsKeyComponent {
+public class RSAKeyComponent extends AbsKeyComponent implements RSAKeyComponentI {
 	
 	/**
 	 * the modulus
@@ -62,6 +63,7 @@ public class RSAKeyComponent extends AbsKeyComponent {
 		return new RSAPublicKey(modulusBigIntComponent.getBigInteger(), exponentBigIntComponent.getBigInteger());
 	}
 	
+	@Override
 	public void setKey(RSAKey rsaKey) {
 		this.modulusBigIntComponent.setBigInteger(rsaKey.getModulus());
 		this.exponentBigIntComponent.setBigInteger(rsaKey.getExponent());

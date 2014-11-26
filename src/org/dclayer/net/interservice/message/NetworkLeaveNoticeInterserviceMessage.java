@@ -11,21 +11,24 @@ import org.dclayer.net.interservice.InterservicePacket;
 
 public class NetworkLeaveNoticeInterserviceMessage extends InterserviceMessage {
 	
-	private FlexNum slotFlexNum = new FlexNum(0, Integer.MAX_VALUE);
+	private FlexNum addressSlotFlexNum = new FlexNum(0, Integer.MAX_VALUE);
+	private FlexNum networkSlotFlexNum = new FlexNum(0, Integer.MAX_VALUE);
 
 	@Override
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
-		slotFlexNum.read(byteBuf);
+		addressSlotFlexNum.read(byteBuf);
+		networkSlotFlexNum.read(byteBuf);
 	}
 
 	@Override
 	public void write(ByteBuf byteBuf) throws BufException {
-		slotFlexNum.write(byteBuf);
+		addressSlotFlexNum.write(byteBuf);
+		networkSlotFlexNum.write(byteBuf);
 	}
 
 	@Override
 	public int length() {
-		return slotFlexNum.length();
+		return addressSlotFlexNum.length() + networkSlotFlexNum.length();
 	}
 
 	@Override
@@ -35,20 +38,28 @@ public class NetworkLeaveNoticeInterserviceMessage extends InterserviceMessage {
 
 	@Override
 	public String toString() {
-		return String.format("NetworkLeaveNoticeInterserviceMessage(slot=%d)", slotFlexNum.getNum());
+		return String.format("NetworkLeaveNoticeInterserviceMessage(addressSlot=%d, networkSlot=%d)", addressSlotFlexNum.getNum(), networkSlotFlexNum.getNum());
 	}
 	
-	public int getSlot() {
-		return (int) slotFlexNum.getNum();
+	public int getAddressSlot() {
+		return (int) addressSlotFlexNum.getNum();
 	}
 	
-	public void setSlot(int slot) {
-		slotFlexNum.setNum(slot);
+	public void setAddressSlot(int slot) {
+		addressSlotFlexNum.setNum(slot);
+	}
+	
+	public int getNetworkSlot() {
+		return (int) networkSlotFlexNum.getNum();
+	}
+	
+	public void setNetworkSlot(int slot) {
+		networkSlotFlexNum.setNum(slot);
 	}
 
 	@Override
 	public int getTypeId() {
-		return InterservicePacket.NETWORK_JOIN_NOTICE;
+		return InterservicePacket.NETWORK_LEAVE_NOTICE;
 	}
 
 	@Override

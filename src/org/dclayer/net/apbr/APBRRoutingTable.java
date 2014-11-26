@@ -4,10 +4,12 @@ import java.util.LinkedList;
 
 import org.dclayer.datastructure.tree.ParentTreeNode;
 import org.dclayer.net.Data;
+import org.dclayer.net.address.Address;
 import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
+import org.dclayer.net.network.routing.ForwardDestination;
 import org.dclayer.net.network.routing.Nexthops;
 import org.dclayer.net.network.routing.RoutingTable;
 
@@ -73,21 +75,33 @@ public class APBRRoutingTable extends RoutingTable {
 	}
 
 	@Override
-	public Nexthops lookup(Data scaledDestinationAddress, Data scaledOriginAddress, int offset) {
+	public Nexthops lookup(Data scaledDestinationAddress, Address originAddress, int offset) {
 		
 		Nexthops nexthops = null;
 		
 		// local? forward to localFordwardDestination and any member that uses the same scaled address (except if scaledOriginAddress equals scaledLocalAddress)
 		if(localNetworkInstance.getScaledAddress().equals(scaledDestinationAddress)) {
 			nexthops = new Nexthops(localNetworkInstance);
-			// don't forward to a member with the same address if it came from one
-			if(!localNetworkInstance.getScaledAddress().equals(scaledOriginAddress)) {
-				// any other members with the same scaled address as us?
-				Nexthops twinNexthops = routes.get(localNetworkInstance.getScaledAddress());
-				if(twinNexthops != null) {
-					nexthops.append(twinNexthops);
+			
+			// any other members with the same scaled address as us?
+			Nexthops twinNexthops = routes.get(localNetworkInstance.getScaledAddress());
+			if(twinNexthops != null) {
+				for(ForwardDestination forwardDestination : twinNexthops) {
+					if(originAddress == forwardDestination.getAddress()) {
+						// do not forward the packet to the hop we just received this packet from
+						// do not forward the packet to any node with the same scaled address as ours
+						// note: if any forward destination in the list of nexthops has the same Address instance as originAddress,
+						//       this means that either:
+						//           1) that hop just routed the packet to us and we'd be loop-routing it back, or
+						//           2) that hop's got the same scaled address as us, was kind enough to also share the packet it
+						//              received with us and we'd be loop-routing it back (since we're also very nice and want to
+						//              share the packet with nodes that use the same scaled address).
+						return null;
+					}
 				}
+				nexthops.append(twinNexthops);
 			}
+			
 			return nexthops;
 		}
 		

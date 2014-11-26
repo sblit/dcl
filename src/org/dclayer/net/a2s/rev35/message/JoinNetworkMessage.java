@@ -3,13 +3,13 @@ package org.dclayer.net.a2s.rev35.message;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.PacketComponent;
-import org.dclayer.net.a2s.ApplicationConnection;
-import org.dclayer.net.a2s.rev35.Message;
+import org.dclayer.net.a2s.A2SMessageReceiver;
+import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
 import org.dclayer.net.a2s.rev35.Rev35Message;
 import org.dclayer.net.a2s.rev35.component.NetworkTypeComponent;
 import org.dclayer.net.buf.ByteBuf;
 
-public class JoinNetworkMessage extends Rev35Message {
+public class JoinNetworkMessage extends A2SRevisionSpecificMessage {
 	
 	private NetworkTypeComponent networkTypeComponent = new NetworkTypeComponent();
 	
@@ -40,7 +40,7 @@ public class JoinNetworkMessage extends Rev35Message {
 	
 	@Override
 	public byte getType() {
-		return Message.JOIN_NETWORK;
+		return Rev35Message.JOIN_NETWORK;
 	}
 	
 	public NetworkTypeComponent getNetworkTypeComponent() {
@@ -48,8 +48,8 @@ public class JoinNetworkMessage extends Rev35Message {
 	}
 
 	@Override
-	public void callOnReceiveMethod(ApplicationConnection applicationConnection) {
-		applicationConnection.onReceiveJoinNetworkMessage(networkTypeComponent.getNetworkType());
+	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
+		a2sMessageReceiver.onReceiveJoinNetworkMessage(networkTypeComponent.getNetworkType());
 	}
 	
 }

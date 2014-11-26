@@ -5,12 +5,19 @@ package org.dclayer.exception.net.parse;
  */
 public class UnsupportedNetworkIdentifierException extends ParseException {
 	
+	private String networkIdentifier;
+	
 	/**
 	 * creates a new {@link UnsupportedNetworkIdentifierException}
 	 * @param identifier the invalid network identifier that was received
 	 */
-	public UnsupportedNetworkIdentifierException(String identifier) {
-		super(String.format("Unsupported network identifier: %s", identifier));
+	public UnsupportedNetworkIdentifierException(String networkIdentifier) {
+		super(String.format("Unsupported network identifier: %s", networkIdentifier));
+		this.networkIdentifier = networkIdentifier;
+	}
+	
+	public String getNetworkIdentifier() {
+		return networkIdentifier;
 	}
 	
 }
