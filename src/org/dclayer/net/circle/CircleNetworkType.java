@@ -25,9 +25,10 @@ public class CircleNetworkType extends NetworkType<CircleNetworkType> {
 		parseAttributeString(attributeString);
 	}
 	
-	public <T extends NetworkPacket> CircleNetworkType(HashAlgorithm hashAlgorithm) {
-		super(NetworkType.IDENTIFIER_APBR);
+	public <T extends NetworkPacket> CircleNetworkType(HashAlgorithm hashAlgorithm, int byteLength) {
+		super(NetworkType.IDENTIFIER_CIRCLE);
 		this.hashAlgorithm = hashAlgorithm;
+		this.byteLength = byteLength;
 	}
 	
 	private void parseAttributeString(String attributeString) throws ParseException {

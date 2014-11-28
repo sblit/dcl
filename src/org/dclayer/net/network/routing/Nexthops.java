@@ -37,6 +37,10 @@ public class Nexthops implements Iterable<ForwardDestination> {
 		this.next = next;
 	}
 	
+	public Nexthops getLast() {
+		return next == null ? this : next.getLast();
+	}
+	
 	public ForwardDestination getForwardDestination() {
 		return forwardDestination;
 	}

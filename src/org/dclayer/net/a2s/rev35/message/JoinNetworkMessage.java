@@ -48,6 +48,11 @@ public class JoinNetworkMessage extends A2SRevisionSpecificMessage {
 	}
 
 	@Override
+	public int getMessageRevision() {
+		return 35;
+	}
+
+	@Override
 	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
 		a2sMessageReceiver.onReceiveJoinNetworkMessage(networkTypeComponent.getNetworkType());
 	}

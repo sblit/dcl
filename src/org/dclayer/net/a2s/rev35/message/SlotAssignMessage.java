@@ -80,5 +80,10 @@ public class SlotAssignMessage extends A2SRevisionSpecificMessage implements Slo
 	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
 		a2sMessageReceiver.onReceiveSlotAssignMessage(getSlot(), networkTypeComponent.getNetworkType(), addressData);
 	}
+
+	@Override
+	public int getMessageRevision() {
+		return 35;
+	}
 	
 }

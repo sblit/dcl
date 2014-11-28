@@ -44,5 +44,10 @@ public class GenerateKeyMessage extends A2SRevisionSpecificMessage {
 	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
 		a2sMessageReceiver.onReceiveGenerateKeyMessage();
 	}
+
+	@Override
+	public int getMessageRevision() {
+		return 35;
+	}
 	
 }

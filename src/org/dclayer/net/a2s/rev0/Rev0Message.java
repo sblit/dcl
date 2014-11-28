@@ -66,13 +66,10 @@ public class Rev0Message extends A2SMessage {
 
 	@Override
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
-		int type = byteBuf.readSpaceTerminatedString().toUpperCase().getBytes(ByteBuf.CHARSET_ASCII)[0] & 0xFF;
-		if(type >= messages.length) {
-			message = null;
-		} else {
+		int type = 0xFF & byteBuf.read();
+		if(type < messages.length) {
 			message = messages[type];
-		}
-		if(message == null) {
+		} else {
 			throw new UnsupportedMessageTypeException(type);
 		}
 		message.read(byteBuf);
@@ -81,14 +78,12 @@ public class Rev0Message extends A2SMessage {
 	@Override
 	public void write(ByteBuf byteBuf) throws BufException {
 		byteBuf.write(message.getType());
-		byteBuf.write((byte)' ');
 		message.write(byteBuf);
-		byteBuf.write((byte)'\n');
 	}
 
 	@Override
 	public int length() {
-		return 3 + message.length();
+		return 1 + message.length();
 	}
 
 	@Override

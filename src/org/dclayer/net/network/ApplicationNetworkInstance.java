@@ -10,7 +10,7 @@ public abstract class ApplicationNetworkInstance extends NetworkInstance {
 	private NetworkSlot networkSlot;
 	
 	public ApplicationNetworkInstance(HierarchicalLevel parentHierarchicalLevel, NetworkType networkType, Address address) {
-		super(parentHierarchicalLevel, networkType, address);
+		super(parentHierarchicalLevel, networkType, address, true);
 	}
 	
 	public void setNetworkSlot(NetworkSlot networkSlot) {

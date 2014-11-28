@@ -75,7 +75,7 @@ public class APBRRoutingTable extends RoutingTable {
 	}
 
 	@Override
-	public Nexthops lookup(Data scaledDestinationAddress, Address originAddress, int offset) {
+	public Nexthops lookup(Data scaledDestinationAddress, Address originAddress, Object originIdentifierObject, int offset) {
 		
 		Nexthops nexthops = null;
 		

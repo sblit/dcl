@@ -31,6 +31,7 @@ import org.dclayer.net.llacache.CachedLLA;
 import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.llacache.LLACache;
 import org.dclayer.net.lladatabase.LLADatabase;
+import org.dclayer.net.network.ApplicationNetworkInstance;
 import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkInstanceCollection;
 import org.dclayer.net.network.NetworkNode;
@@ -104,7 +105,7 @@ public class DCLService implements OnReceiveListener, NetworkInstanceListener, A
 	
 	public void join(NetworkType networkType) {
 		
-		NetworkInstance networkInstance = new NetworkInstance(this, networkType, localAddress) {
+		NetworkInstance networkInstance = new NetworkInstance(this, networkType, localAddress, true) {
 			@Override
 			public boolean onForward(NetworkPacket networkPacket) {
 				Log.msg(this, "received NetworkPacket: %s", networkPacket.represent(true));

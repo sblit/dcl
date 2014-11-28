@@ -24,21 +24,20 @@ public class SlotAssignMessage extends A2SRevisionSpecificMessage implements Slo
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
 		slotFlexNum.read(byteBuf);
 		networkTypeComponent.read(byteBuf);
-		(addressData = ownAddressData).parse(byteBuf.readSpaceTerminatedString());
+		ownAddressData.prepare(networkTypeComponent.getNetworkType().getAddressNumBytes());
+		byteBuf.read(addressData = ownAddressData);
 	}
 	
 	@Override
 	public void write(ByteBuf byteBuf) throws BufException {
 		slotFlexNum.write(byteBuf);
-		byteBuf.write((byte)' ');
 		networkTypeComponent.write(byteBuf);
-		byteBuf.write((byte)' ');
-		byteBuf.writeNonTerminatedString(addressData.toString());
+		byteBuf.write(addressData);
 	}
 	
 	@Override
 	public int length() {
-		return slotFlexNum.length() + 1 + networkTypeComponent.length() + 1 + 2*addressData.length();
+		return slotFlexNum.length() + networkTypeComponent.length() + addressData.length();
 	}
 	
 	@Override
@@ -79,6 +78,11 @@ public class SlotAssignMessage extends A2SRevisionSpecificMessage implements Slo
 	@Override
 	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
 		a2sMessageReceiver.onReceiveSlotAssignMessage(getSlot(), networkTypeComponent.getNetworkType(), addressData);
+	}
+
+	@Override
+	public int getMessageRevision() {
+		return 0;
 	}
 	
 }

@@ -6,6 +6,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.LinkedList;
 
+import org.dclayer.crypto.hash.HashAlgorithm;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.apbr.APBRNetworkType;
@@ -20,10 +21,8 @@ public class DCL {
 	 * The current revision of this DCL Service implementation
 	 */
 	public static final int REVISION = 0;
-	/**
-	 * the protocol identifier used for application data channels
-	 */
-	public static final String CHANNEL_APPDATA = "org.dclayer.s2s.rev0.appdata";
+	
+	public static final NetworkType[] DEFAULT_NETWORK_TYPES = new NetworkType[] { new CircleNetworkType(HashAlgorithm.SHA1, 1) };
 
 	public static void main(String[] args) throws ParseException {
 		

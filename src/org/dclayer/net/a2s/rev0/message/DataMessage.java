@@ -32,9 +32,7 @@ public class DataMessage extends A2SRevisionSpecificMessage implements DataMessa
 	public void write(ByteBuf byteBuf) throws BufException {
 		
 		slotFlexNum.write(byteBuf);
-		byteBuf.write((byte)' ');
 		addressComponent.write(byteBuf);
-		byteBuf.write((byte)' ');
 		dataComponent.write(byteBuf);
 		
 	}
@@ -42,9 +40,7 @@ public class DataMessage extends A2SRevisionSpecificMessage implements DataMessa
 	@Override
 	public int length() {
 		return 	+ slotFlexNum.length()
-				+ 1
 				+ addressComponent.length()
-				+ 1
 				+ dataComponent.length();
 	}
 	
@@ -85,6 +81,11 @@ public class DataMessage extends A2SRevisionSpecificMessage implements DataMessa
 	@Override
 	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
 		a2sMessageReceiver.onReceiveDataMessage((int) slotFlexNum.getNum(), addressComponent.getAddressData(), dataComponent.getData());
+	}
+
+	@Override
+	public int getMessageRevision() {
+		return 0;
 	}
 	
 }

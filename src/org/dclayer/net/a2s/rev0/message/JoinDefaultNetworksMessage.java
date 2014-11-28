@@ -45,5 +45,10 @@ public class JoinDefaultNetworksMessage extends A2SRevisionSpecificMessage imple
 	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
 		a2sMessageReceiver.onReceiveJoinDefaultNetworksMessage();
 	}
+
+	@Override
+	public int getMessageRevision() {
+		return 0;
+	}
 	
 }

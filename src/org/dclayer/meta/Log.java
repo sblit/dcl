@@ -35,6 +35,7 @@ public class Log {
 		// specify reversed paths here (e.g. { InterserviceChannel.class, DCLService.class, DCL.class })
 		// if the end of a log message's path matches one of the arrays below reserved, the message is printed only if
 		// the log level of the message is equal to or higher than the level specified here
+		
 //		new IgnoreEntry(Level.DEBUG, InterserviceChannel.class), // show all log messages from InterserviceChannel instances only
 		new IgnoreEntry(Level.WARNING, UDPSocket.class),
 		new IgnoreEntry(Level.WARNING, FlowControl.class),

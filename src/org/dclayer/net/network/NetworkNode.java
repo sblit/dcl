@@ -8,18 +8,24 @@ import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
 import org.dclayer.net.network.routing.ForwardDestination;
 import org.dclayer.net.network.routing.RoutingTable;
 
-public abstract class NetworkNode implements ForwardDestination {
+public abstract class NetworkNode<T> implements ForwardDestination<T> {
 	
 	private NetworkType networkType;
 	private Address address;
 	
 	private Data scaledAddress;
 	
+	private T identifierObject;
+	
 	private NetworkPayload outNetworkPayload;
 	
-	public NetworkNode(NetworkType networkType, Address address) {
+	private boolean endpoint = false;
+	
+	public NetworkNode(NetworkType networkType, Address address, T identifierObject, boolean endpoint) {
 		this.networkType = networkType;
 		this.address = address;
+		this.identifierObject = identifierObject;
+		this.endpoint = endpoint;
 		this.scaledAddress = networkType.scaleAddress(address);
 	}
 	
@@ -37,6 +43,11 @@ public abstract class NetworkNode implements ForwardDestination {
 		return scaledAddress;
 	}
 	
+	@Override
+	public T getIdentifierObject() {
+		return identifierObject;
+	}
+	
 	public void setOutNetworkPayload(CommonNetworkPayloadProperties commonNetworkPayloadProperties) {
 		this.outNetworkPayload = networkType.makeOutNetworkPayload(scaledAddress, commonNetworkPayloadProperties);
 	}
@@ -51,6 +62,10 @@ public abstract class NetworkNode implements ForwardDestination {
 	
 	public boolean forward(NetworkPacket networkPacket) {
 		return this.onForward(networkPacket);
+	}
+	
+	public final boolean isEndpoint() {
+		return endpoint;
 	}
 	
 	@Override

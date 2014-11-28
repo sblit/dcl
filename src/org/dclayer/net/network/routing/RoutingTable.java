@@ -9,7 +9,7 @@ public abstract class RoutingTable {
 	
 	public abstract boolean add(NetworkNode networkNode);
 	public abstract boolean remove(NetworkNode networkNode);
-	public abstract Nexthops lookup(Data destinationAddressData, Address originAddress, int offset);
+	public abstract Nexthops lookup(Data destinationAddressData, Address originAddress, Object originIdentifierObject, int offset);
 	
 	public abstract NetworkType getNetworkType();
 	

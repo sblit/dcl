@@ -20,12 +20,13 @@ public class CircleRoutingTable extends RoutingTable implements HierarchicalLeve
 	private CircleNetworkType circleNetworkType;
 	
 	private NetworkInstance localNetworkInstance;
-
-	private ParentTreeNode<Nexthops> ownRoutes = new ParentTreeNode<>(0);
-	private LinkedList<NetworkNode> neighborNetworkNodes = new LinkedList<>();
 	
-	private ParentTreeNode<Nexthops> routes = ownRoutes;
-	private LinkedList<NetworkNode> connectedTableNeighbors = null;
+	private ParentTreeNode<Nexthops> remoteServiceRoutes = new ParentTreeNode<>(0);
+	private ParentTreeNode<Nexthops> localEndpointRoutes = new ParentTreeNode<>(0);
+	
+	private LinkedList<NetworkNode> networkNodes = new LinkedList<>();
+	
+	private LinkedList<NetworkNode> networkNodesCopiedToConnectedTable = null;
 	private CircleRoutingTable connectedCircleRoutingTable = null;
 	
 	public <T extends NetworkPacket> CircleRoutingTable(CircleNetworkType circleNetworkType, NetworkInstance networkInstance) {
@@ -35,7 +36,13 @@ public class CircleRoutingTable extends RoutingTable implements HierarchicalLeve
 	}
 
 	@Override
-	public boolean add(NetworkNode networkNode) {
+	public synchronized boolean add(NetworkNode networkNode) {
+		
+		if(connectedCircleRoutingTable != null) {
+			return connectedCircleRoutingTable.add(networkNode);
+		}
+		
+		ParentTreeNode<Nexthops> routes = networkNode.isEndpoint() ? localEndpointRoutes : remoteServiceRoutes;
 		
 		Data scaledDestinationAddress = networkNode.getScaledAddress();
 		
@@ -51,14 +58,21 @@ public class CircleRoutingTable extends RoutingTable implements HierarchicalLeve
 			}
 			nexthops.append(networkNode);
 		}
-		neighborNetworkNodes.add(networkNode);
+		
+		networkNodes.add(networkNode);
 		
 		return true;
 		
 	}
 
 	@Override
-	public boolean remove(NetworkNode networkNode) {
+	public synchronized boolean remove(NetworkNode networkNode) {
+		
+		if(connectedCircleRoutingTable != null) {
+			return connectedCircleRoutingTable.remove(networkNode);
+		}
+		
+		ParentTreeNode<Nexthops> routes = networkNode.isEndpoint() ? localEndpointRoutes : remoteServiceRoutes;
 		
 		Data scaledDestinationAddress = networkNode.getScaledAddress();
 		
@@ -105,46 +119,78 @@ public class CircleRoutingTable extends RoutingTable implements HierarchicalLeve
 			
 		} while(nexthops != null);
 		
+		networkNodes.remove(networkNode);
+		
 		return success;
 		
 	}
 
 	@Override
-	public Nexthops lookup(Data scaledDestinationAddress, Address originAddress, int offset) {
+	public synchronized Nexthops lookup(Data scaledDestinationAddress, Address originAddress, Object originIdentifierObject, int offset) {
 		
-		Nexthops nexthops = routes.getClosest(scaledDestinationAddress);
+		if(connectedCircleRoutingTable != null) {
+			return connectedCircleRoutingTable.lookup(scaledDestinationAddress, originAddress, originIdentifierObject, offset);
+		}
+		
+		// check if the destination address refers to one of our local endpoints
+		Nexthops nexthops = localEndpointRoutes.get(scaledDestinationAddress);
+		if(nexthops != null) {
+			// great, the packet belongs to us
+			
+			// before returning the list of nexthops (which are only local endpoints at this point), check
+			// if there are any neighbors with the same scaled address and if yes, add them to the nexthops
+			// list, as long as we did not already receive this packet from such a twin neighbor
+			Nexthops twinNeighbors = remoteServiceRoutes.get(scaledDestinationAddress); // here, use get() instead of getClosest()
+			if(twinNeighbors != null) {
+				
+				boolean append = true;
+				
+				for(ForwardDestination forwardDestination : twinNeighbors) {
+					if(forwardDestination.getIdentifierObject() == originIdentifierObject) {
+						// if we already received the packet from such a twin neighbor,
+						// don't loop-route it back.
+						// note: all the hops in the twinNexthops list share the same scaled address
+						//       as us, and if one of their ForwardDestinations holds the originAddress
+						//       Address instance, we received the packet from that hop, who also takes
+						//       care of forwarding the packet to the other twins. just locally deliver the packet.
+						append = false;
+						break;
+					}
+				}
+				
+				if(append) {
+					nexthops.append(twinNeighbors);
+				}
+				
+			}
+			
+			return nexthops;
+		}
+		
+		// looks like we don't have a local endpoint for this address, so check if we can forward
+		// it to somebody who's closer to the destination
+		
+		nexthops = remoteServiceRoutes.getClosest(scaledDestinationAddress);
 		
 		if(nexthops == null) {
+			// nothing found
 			return null;
 		}
 		
 		for(ForwardDestination forwardDestination : nexthops) {
-			if(originAddress == forwardDestination.getAddress()) {
-				// do not forward the packet to the hop we just received this packet from
-				// do not forward the packet to any node with the same scaled address as ours
-				// note: if any forward destination in the list of nexthops has the same Address instance as originAddress,
-				//       this means that either:
-				//           1) that hop just routed the packet to us and we'd be loop-routing it back, or
-				//           2) that hop's got the same scaled address as us, was kind enough to also share the packet it
-				//              received with us and we'd be loop-routing it back (since we're also very nice and want to
-				//              share the packet with nodes that use the same scaled address).
+			if(forwardDestination.getIdentifierObject() == originIdentifierObject) {
+				// to prevent loop-routing, do not forward the packet at all if the
+				// the hop we just received it from is included in the nexthops list
 				return null;
 			}
 		}
 		
-		if(localNetworkInstance.getScaledAddress().equals(nexthops.getForwardDestination().getScaledAddress())) {
-			// we do not forward to ourselves, however, we do forward to other nodes who use the same scaled address.
-			// we now need to forward to everybody in nexthops except ourselves, so we just pop off ourselves by
-			// simply removing the first element (we're always the first because the local network instance is
-			// the first to be added to the tree)
-			nexthops = nexthops.getNext();
-		}
+		// now, only forward to one hop. if there are more than one hops with the same
+		// scaled address (which is the case if nexthops contains more than one
+		// ForwardDestination), the hop we forward the packet to will be connected to its
+		// twins and share the packet with them.
 		
-		if(nexthops == null) {
-			return null;
-		}
-		
-		return nexthops;
+		return nexthops.getLast();
 		
 	}
 
@@ -154,40 +200,58 @@ public class CircleRoutingTable extends RoutingTable implements HierarchicalLeve
 	}
 
 	@Override
-	public void connect(RoutingTable routingTable) {
+	public synchronized void connect(RoutingTable routingTable) {
 		
 		Log.debug(this, "connecting with %s", routingTable);
 		
-		if(connectedTableNeighbors != null) {
+		if(networkNodesCopiedToConnectedTable != null) {
 			Log.debug(this, "disconnecting first");
 			disconnect();
 		}
 		
 		connectedCircleRoutingTable = (CircleRoutingTable) routingTable;
 		
-		connectedTableNeighbors = new LinkedList<>();
-		this.routes = connectedCircleRoutingTable.routes;
+		networkNodesCopiedToConnectedTable = new LinkedList<>();
 		
-		for(NetworkNode networkNode : neighborNetworkNodes) {
+		for(NetworkNode networkNode : networkNodes) {
 			if(connectedCircleRoutingTable.add(networkNode)) {
 				Log.debug(this, "copied NetworkNode: %s", networkNode);
-				connectedTableNeighbors.add(networkNode);
+				networkNodesCopiedToConnectedTable.add(networkNode);
 			} else {
-				Log.debug(this, "NetworkNode node copied: %s", networkNode);
+				Log.debug(this, "NetworkNode not copied: %s", networkNode);
 			}
 		}
+		
+		// clear local table, refill it when disconnecting
+		this.remoteServiceRoutes = null;
+		this.localEndpointRoutes = null;
+		this.networkNodes.clear();
 		
 	}
 
 	@Override
-	public void disconnect() {
+	public synchronized void disconnect() {
 		
-		for(NetworkNode networkNode : connectedTableNeighbors) {
-			Log.debug(this, "removing NetworkNode from connected table: %s", networkNode);
-			connectedCircleRoutingTable.remove(networkNode);
+		this.remoteServiceRoutes = new ParentTreeNode<>(0);
+		this.localEndpointRoutes = new ParentTreeNode<>(0);
+		
+		for(NetworkNode networkNode : networkNodesCopiedToConnectedTable) {
+			
+			if(connectedCircleRoutingTable.remove(networkNode)) {
+				Log.debug(this, "removed NetworkNode from connected table: %s", networkNode);
+			} else {
+				Log.debug(this, "NetworNode not removed from connected table: %s", networkNode);
+			}
+			
+			if(add(networkNode)) {
+				Log.debug(this, "reinserted NetworkNode: %s", networkNode);
+			} else {
+				Log.debug(this, "NetworkNode not reinserted: %s", networkNode);
+			}
+			
 		}
 		
-		connectedTableNeighbors = null;
+		networkNodesCopiedToConnectedTable = null;
 		connectedCircleRoutingTable = null;
 		
 	}

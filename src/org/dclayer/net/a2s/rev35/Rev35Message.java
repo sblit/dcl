@@ -9,6 +9,7 @@ import org.dclayer.net.a2s.A2SMessageReceiver;
 import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
 import org.dclayer.net.a2s.message.AddressPublicKeyMessageI;
 import org.dclayer.net.a2s.message.JoinDefaultNetworksMessageI;
+import org.dclayer.net.a2s.rev0.Rev0Message;
 import org.dclayer.net.a2s.rev35.message.DataMessage;
 import org.dclayer.net.a2s.rev35.message.GenerateKeyMessage;
 import org.dclayer.net.a2s.rev35.message.JoinNetworkMessage;
@@ -21,7 +22,7 @@ import org.dclayer.net.buf.ByteBuf;
  */
 public class Rev35Message extends A2SMessage {
 
-	public static final int REVISION_BINARY = 0;
+	public static final int REVISION_BINARY = Rev0Message.REVISION; // 0
 	public static final int DATA = 0xFF & (byte)'D';
 	public static final int GENERATE_KEY = 0xFF & (byte)'G';
 	public static final int JOIN_NETWORK = 0xFF & (byte)'J';
@@ -63,15 +64,12 @@ public class Rev35Message extends A2SMessage {
 	@Override
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
 		int type = 0xFF & byteBuf.read();
-		if(type >= messages.length) {
-			message = null;
-		} else {
+		if(type < messages.length) {
 			message = messages[type];
-		}
-		if(message == null) {
+		} else {
 			throw new UnsupportedMessageTypeException(type);
 		}
-		byteBuf.readTilSpaceOrEOL();
+		if(message.getMessageRevision() == 35) byteBuf.readTilSpaceOrEOL();
 		message.read(byteBuf);
 	}
 

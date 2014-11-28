@@ -8,13 +8,13 @@ import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.routing.Nexthops;
 import org.dclayer.net.network.routing.RoutingTable;
 
-public abstract class NetworkInstance extends NetworkNode implements HierarchicalLevel {
+public abstract class NetworkInstance extends NetworkNode<Object> implements HierarchicalLevel {
 	
 	private HierarchicalLevel parentHierarchicalLevel;
 	private RoutingTable routingTable;
 	
-	public NetworkInstance(HierarchicalLevel parentHierarchicalLevel, NetworkType networkType, Address address) {
-		super(networkType, address);
+	public NetworkInstance(HierarchicalLevel parentHierarchicalLevel, NetworkType networkType, Address address, boolean endpoint) {
+		super(networkType, address, null, endpoint);
 		this.parentHierarchicalLevel = parentHierarchicalLevel;
 		this.routingTable = networkType.makeRoutingTable(this);
 	}
@@ -28,7 +28,7 @@ public abstract class NetworkInstance extends NetworkNode implements Hierarchica
 	public boolean forward(NetworkPacket networkPacket) {
 		
 		Data destinationAddressData = networkPacket.getDestinationAddressData();
-		Nexthops nexthops = routingTable.lookup(destinationAddressData, networkPacket.getNetworkSlot().getNetworkNodes().get(0).getAddress(), 0);
+		Nexthops nexthops = routingTable.lookup(destinationAddressData, null, networkPacket.getNetworkSlot().getRemoteEquivalent(), 0);
 		
 		if(nexthops == null) {
 			

@@ -81,5 +81,10 @@ public class DataMessage extends A2SRevisionSpecificMessage implements DataMessa
 	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
 		a2sMessageReceiver.onReceiveDataMessage((int) slotNumberComponent.getNum(), addressComponent.getAddressData(), dataComponent.getData());
 	}
+
+	@Override
+	public int getMessageRevision() {
+		return 35;
+	}
 	
 }

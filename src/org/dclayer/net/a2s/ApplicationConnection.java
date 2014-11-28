@@ -5,8 +5,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 
+import org.dclayer.DCL;
 import org.dclayer.crypto.Crypto;
 import org.dclayer.crypto.key.KeyPair;
+import org.dclayer.exception.crypto.CryptoException;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.HierarchicalLevel;
@@ -315,12 +317,20 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	
 	@Override
 	public void onReceiveAddressPublicKeyMessage(AbsKeyComponentI absKeyComponentI) {
-		
+		Log.debug(this, "onReceiveAddressPublicKeyMessage(%s)", absKeyComponentI);
+		try {
+			setApplicationAddressKeyPair(KeyPair.fromPublicKey(absKeyComponentI.getKey()));
+		} catch (CryptoException e) {
+			Log.exception(this, e);
+		}
 	}
 
 	@Override
 	public void onReceiveJoinDefaultNetworksMessage() {
-		
+		Log.debug(this, "onReceiveJoinDefaultNetworksMessage()");
+		for(NetworkType networkType : DCL.DEFAULT_NETWORK_TYPES) {
+			joinNetwork(networkType);
+		}
 	}
 	
 	//

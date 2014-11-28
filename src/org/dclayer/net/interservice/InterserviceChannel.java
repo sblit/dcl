@@ -35,6 +35,7 @@ import org.dclayer.net.llacache.CachedLLA;
 import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
+import org.dclayer.net.network.RemoteNetworkNode;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.slot.AddressSlot;
 import org.dclayer.net.network.slot.AddressSlotMap;
@@ -420,7 +421,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 			
 		}
 		
-		NetworkNode remoteNetworkNode = new NetworkNode(networkType, remoteAddressSlot.getAsymmetricKeyPairAddress()) {
+		NetworkNode remoteNetworkNode = new RemoteNetworkNode(networkType, remoteAddressSlot.getAsymmetricKeyPairAddress(), remoteNetworkSlot) {
 			@Override
 			public boolean onForward(NetworkPacket networkPacket) {
 				sendNetworkPacket(networkPacket, networkSlotId);

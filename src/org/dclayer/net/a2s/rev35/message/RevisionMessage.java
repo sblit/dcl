@@ -58,5 +58,10 @@ public class RevisionMessage extends A2SRevisionSpecificMessage implements Revis
 	public int getRevision() {
 		return (int) revisionNumberComponent.getNum();
 	}
+
+	@Override
+	public int getMessageRevision() {
+		return 35;
+	}
 	
 }

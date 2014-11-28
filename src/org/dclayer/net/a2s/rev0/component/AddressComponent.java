@@ -5,31 +5,31 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.componentinterface.AddressComponentI;
 
 public class AddressComponent extends PacketComponent implements AddressComponentI {
 	
-	private Data addressData;
-	private Data ownAddressData = new Data();
+	private DataComponent addressDataComponent = new DataComponent();
 	
 	@Override
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
-		byteBuf.read(addressData = ownAddressData);
+		addressDataComponent.read(byteBuf);
 	}
 
 	@Override
 	public void write(ByteBuf byteBuf) throws BufException {
-		byteBuf.write(addressData);
+		addressDataComponent.write(byteBuf);
 	}
 
 	@Override
 	public int length() {
-		return addressData == null ? 0 : addressData.length();
+		return addressDataComponent.length();
 	}
 
 	@Override
 	public String toString() {
-		return String.format("AddressComponent(address=%s)", addressData);
+		return String.format("AddressComponent(address=%s)", addressDataComponent.getData());
 	}
 
 	@Override
@@ -39,12 +39,12 @@ public class AddressComponent extends PacketComponent implements AddressComponen
 	
 	@Override
 	public Data getAddressData() {
-		return addressData;
+		return addressDataComponent.getData();
 	}
 	
 	@Override
 	public void setAddressData(Data addressData) {
-		this.addressData = addressData;
+		addressDataComponent.setData(addressData);
 	}
 	
 }

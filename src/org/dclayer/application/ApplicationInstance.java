@@ -130,6 +130,8 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 				return;
 			}
 			
+//			System.out.println(a2sMessage.represent(true));
+			
 			a2sMessage.callOnReceiveMethod(this);
 			
 		}
@@ -200,7 +202,9 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 
 	@Override
 	public void onReceiveSlotAssignMessage(int slot, NetworkType networkType, Data addressData) {
-		networkEndpointSlotMap.put(slot, new NetworkEndpoint(networkType, defaultNetworksOnReceiveListener));
+		NetworkEndpoint networkEndpoint = new NetworkEndpoint(networkType, defaultNetworksOnReceiveListener);
+		networkEndpointSlotMap.put(slot, networkEndpoint);
+		networkEndpoint.getOnReceiveListener().onJoin(networkType, addressData);
 	}
 
 	@Override

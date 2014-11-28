@@ -53,5 +53,10 @@ public class AddressPublicKeyMessage extends A2SRevisionSpecificMessage implemen
 	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
 		a2sMessageReceiver.onReceiveAddressPublicKeyMessage(addressPublicKeyComponent.getKeyComponent());
 	}
+
+	@Override
+	public int getMessageRevision() {
+		return 0;
+	}
 	
 }
