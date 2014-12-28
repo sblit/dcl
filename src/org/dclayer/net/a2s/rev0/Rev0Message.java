@@ -8,12 +8,20 @@ import org.dclayer.net.a2s.A2SMessage;
 import org.dclayer.net.a2s.A2SMessageReceiver;
 import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
 import org.dclayer.net.a2s.message.AddressPublicKeyMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelRequestMessageI;
 import org.dclayer.net.a2s.message.JoinDefaultNetworksMessageI;
+import org.dclayer.net.a2s.message.KeyCryptoResponseDataMessageI;
+import org.dclayer.net.a2s.message.KeyDecryptDataMessageI;
+import org.dclayer.net.a2s.message.KeyEncryptDataMessageI;
 import org.dclayer.net.a2s.rev0.message.AddressPublicKeyMessage;
+import org.dclayer.net.a2s.rev0.message.ApplicationChannelRequestMessage;
 import org.dclayer.net.a2s.rev0.message.DataMessage;
 import org.dclayer.net.a2s.rev0.message.GenerateKeyMessage;
 import org.dclayer.net.a2s.rev0.message.JoinDefaultNetworksMessage;
 import org.dclayer.net.a2s.rev0.message.JoinNetworkMessage;
+import org.dclayer.net.a2s.rev0.message.KeyCryptoResponseDataMessage;
+import org.dclayer.net.a2s.rev0.message.KeyDecryptDataMessage;
+import org.dclayer.net.a2s.rev0.message.KeyEncryptDataMessage;
 import org.dclayer.net.a2s.rev0.message.RevisionMessage;
 import org.dclayer.net.a2s.rev0.message.SlotAssignMessage;
 import org.dclayer.net.buf.ByteBuf;
@@ -30,6 +38,10 @@ public class Rev0Message extends A2SMessage {
 	public static final int DATA = 4;
 	public static final int ADDRESS_PUBLIC_KEY = 5;
 	public static final int JOIN_DEFAULT_NETWORKS = 6;
+	public static final int KEY_ENCRYPT_DATA = 7;
+	public static final int KEY_DECRYPT_DATA = 8;
+	public static final int KEY_CRYPTO_RESPONSE_DATA = 9;
+	public static final int APPLICATION_CHANNEL_REQUEST = 10;
 
 	private A2SRevisionSpecificMessage message;
 	
@@ -40,7 +52,11 @@ public class Rev0Message extends A2SMessage {
 		new SlotAssignMessage(),
 		new DataMessage(),
 		new AddressPublicKeyMessage(),
-		new JoinDefaultNetworksMessage()
+		new JoinDefaultNetworksMessage(),
+		new KeyEncryptDataMessage(),
+		new KeyDecryptDataMessage(),
+		new KeyCryptoResponseDataMessage(),
+		new ApplicationChannelRequestMessage()
 	};
 
 	@Override
@@ -121,6 +137,26 @@ public class Rev0Message extends A2SMessage {
 	@Override
 	public JoinDefaultNetworksMessageI setJoinDefaultNetworksMessage() {
 		return (JoinDefaultNetworksMessage)(this.message = messages[JOIN_DEFAULT_NETWORKS]);
+	}
+
+	@Override
+	public KeyEncryptDataMessageI setKeyEncryptDataMessage() {
+		return (KeyEncryptDataMessage)(this.message = messages[KEY_ENCRYPT_DATA]);
+	}
+	
+	@Override
+	public KeyDecryptDataMessageI setKeyDecryptDataMessage() {
+		return (KeyDecryptDataMessage)(this.message = messages[KEY_DECRYPT_DATA]);
+	}
+
+	@Override
+	public KeyCryptoResponseDataMessageI setKeyCryptoResponseDataMessage() {
+		return (KeyCryptoResponseDataMessage)(this.message = messages[KEY_CRYPTO_RESPONSE_DATA]);
+	}
+
+	@Override
+	public ApplicationChannelRequestMessageI setApplicationChannelRequestMessage() {
+		return (ApplicationChannelRequestMessage)(this.message = messages[APPLICATION_CHANNEL_REQUEST]);
 	}
 
 }

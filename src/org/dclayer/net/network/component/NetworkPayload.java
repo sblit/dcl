@@ -4,6 +4,7 @@ import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
+import org.dclayer.net.PacketComponentI;
 import org.dclayer.net.buf.DataByteBuf;
 import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.network.NetworkType;
@@ -41,11 +42,15 @@ public abstract class NetworkPayload extends PacketComponent {
 		this.readDataComponent = dataComponent;
 	}
 	
-	public abstract boolean destinedForService();
+	public abstract void setDestinedForService(boolean destinedForService);
+	public abstract boolean isDestinedForService();
 	
 	public abstract Data getSourceAddressData();
-	public abstract Data getPayloadData();
 	
+	public abstract Data getPayloadData();
 	public abstract void setPayloadData(Data payloadData);
+	
+	public abstract void setPayloadData(PacketComponentI packetComponent) throws BufException;
+	public abstract void getPayloadData(PacketComponentI packetComponent) throws BufException, ParseException;
 	
 }

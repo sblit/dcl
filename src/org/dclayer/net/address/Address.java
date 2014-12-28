@@ -50,4 +50,9 @@ public class Address<T extends Key> {
 		return keyPair.equals(((Address)o).keyPair);
 	}
 	
+	@Override
+	public int hashCode() {
+		return keyPair.hashCode();
+	}
+	
 }

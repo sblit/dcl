@@ -5,7 +5,9 @@ import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
+import org.dclayer.net.PacketComponentI;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.buf.DataByteBuf;
 import org.dclayer.net.componentinterface.DataComponentI;
 
 /**
@@ -23,11 +25,19 @@ public class DataComponent extends PacketComponent implements DataComponentI {
 	 */
 	private FlexNum dataLength;
 	
+	private DataByteBuf dataByteBuf = null;
+	
 	/**
 	 * creates an empty {@link DataComponent} that must first be read into before it can be written from
 	 */
 	public DataComponent() {
 		this.dataLength = new FlexNum();
+	}
+	
+	private void verifyLength() {
+		int curLength = data == null ? 0 : data.length();
+		if(this.dataLength.getNum() == curLength) return;
+		this.dataLength.setNum(curLength);
 	}
     
     /**
@@ -46,7 +56,32 @@ public class DataComponent extends PacketComponent implements DataComponentI {
     @Override
 	public void setData(Data data) {
 		this.data = data;
-		this.dataLength.setNum(data.length());
+		verifyLength();
+	}
+
+	@Override
+	public void setData(PacketComponentI packetComponent) throws BufException {
+		
+		if(ownData == null) ownData = new Data();
+		if(dataByteBuf == null) dataByteBuf = new DataByteBuf();
+		
+		data = ownData;
+		data.prepare(packetComponent.length());
+		dataByteBuf.setData(data);
+		
+		packetComponent.write(dataByteBuf);
+		
+		verifyLength();
+		
+	}
+
+	@Override
+	public void getData(PacketComponentI packetComponent) throws BufException, ParseException {
+		
+		if(dataByteBuf == null) dataByteBuf = new DataByteBuf();
+		dataByteBuf.setData(data);
+		packetComponent.read(dataByteBuf);
+		
 	}
 
 	@Override
@@ -64,18 +99,21 @@ public class DataComponent extends PacketComponent implements DataComponentI {
 
 	@Override
 	public void write(ByteBuf byteBuf) throws BufException {
+		verifyLength();
 		dataLength.write(byteBuf);
-		byteBuf.write(data);
+		if(data != null) byteBuf.write(data);
 	}
 
 	@Override
 	public int length() {
-		return dataLength.length() + data.length();
+		verifyLength();
+		return dataLength.length() + (int) dataLength.getNum();
 	}
 
 	@Override
 	public String toString() {
-		return String.format("DataComponent(len=%d)", data.length());
+		verifyLength();
+		return String.format("DataComponent(len=%s)", (int) dataLength.getNum());
 	}
 
 	@Override

@@ -32,9 +32,21 @@ public class KeyPair<T extends Key> {
 		return privateKey;
 	}
 	
+	@Override
+	public boolean equals(Object o) {
+		if(this == o) return true;
+		if(!(o instanceof KeyPair)) return false;
+		return equals((KeyPair<?>) o);
+	}
+	
 	public boolean equals(KeyPair<?> keyPair) {
 		return ((this.publicKey != null && keyPair.publicKey != null && this.publicKey.equals(keyPair.publicKey)) || this.publicKey == keyPair.publicKey)
 				&& ((this.privateKey != null && keyPair.privateKey != null && this.privateKey.equals(keyPair.privateKey)) || this.privateKey == keyPair.privateKey);
+	}
+	
+	@Override
+	public int hashCode() {
+		return (publicKey == null ? 0 : publicKey.hashCode()) + (privateKey == null ? 0 : privateKey.hashCode()); 
 	}
 	
 }

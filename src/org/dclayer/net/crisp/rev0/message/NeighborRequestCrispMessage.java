@@ -1,0 +1,94 @@
+package org.dclayer.net.crisp.rev0.message;
+
+import org.dclayer.exception.net.buf.BufException;
+import org.dclayer.exception.net.parse.ParseException;
+import org.dclayer.net.PacketComponent;
+import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.component.KeyEncryptedPacketComponent;
+import org.dclayer.net.crisp.CrispMessage;
+import org.dclayer.net.crisp.CrispMessageReceiver;
+import org.dclayer.net.crisp.CrispPacket;
+import org.dclayer.net.crisp.message.NeighborRequestCrispMessageI;
+import org.dclayer.net.llacache.LLA;
+
+public class NeighborRequestCrispMessage extends KeyEncryptedPacketComponent implements NeighborRequestCrispMessageI, CrispMessage {
+	
+	private String actionIdentifier;
+	private LLA senderLLA = null;
+	
+	private boolean response = false;
+	
+	@Override
+	public void readPlain(ByteBuf byteBuf) throws ParseException, BufException {
+		
+		actionIdentifier = byteBuf.readString();
+		senderLLA = LLA.fromByteBuf(byteBuf);
+		response = byteBuf.read() != 0;
+		
+	}
+
+	@Override
+	public void writePlain(ByteBuf byteBuf) throws BufException {
+		
+		byteBuf.writeString(actionIdentifier);
+		senderLLA.write(byteBuf);
+		byteBuf.write((byte)(response ? 0xFF : 0));
+		
+	}
+
+	@Override
+	public int plainLength() {
+		return actionIdentifier.length() + 1 + senderLLA.length() + 1;
+	}
+
+	@Override
+	public PacketComponent[] getPlainChildren() {
+		return null;
+	}
+
+	@Override
+	public String plainToString() {
+		return String.format("NeighborRequestCrispMessage(actionIdentifier=%s, senderLLA=%s)", actionIdentifier, senderLLA);
+	}
+
+	@Override
+	public int getType() {
+		return CrispPacket.NEIGHBOR_REQUEST;
+	}
+
+	@Override
+	public String getActionIdentifier() {
+		return actionIdentifier;
+	}
+
+	@Override
+	public void setActionIdentifier(String actionIdentifier) {
+		this.actionIdentifier = actionIdentifier;
+	}
+
+	@Override
+	public LLA getSenderLLA() {
+		return senderLLA;
+	}
+
+	@Override
+	public void setSenderLLA(LLA senderLLA) {
+		this.senderLLA = senderLLA;
+	}
+
+	@Override
+	public boolean isResponse() {
+		return response;
+	}
+
+	@Override
+	public void setResponse(boolean response) {
+		this.response = response;
+	}
+
+	@Override
+	public <T> void callOnReceiveMethod(CrispMessageReceiver<T> crispMessageReceiver, T o) {
+		crispMessageReceiver.onReceiveNeighborRequestCrispMessage(this, o);
+	}
+
+}

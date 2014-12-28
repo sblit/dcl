@@ -8,7 +8,6 @@ import java.util.Calendar;
 import java.util.LinkedList;
 
 import org.dclayer.datastructure.map.slotmap.Slot;
-import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.link.Link;
 import org.dclayer.net.link.channel.Channel;
 import org.dclayer.net.link.control.FlowControl;
@@ -33,7 +32,7 @@ public class Log {
 	
 	public static final IgnoreEntry[] IGNORE = new IgnoreEntry[] {
 		// specify reversed paths here (e.g. { InterserviceChannel.class, DCLService.class, DCL.class })
-		// if the end of a log message's path matches one of the arrays below reserved, the message is printed only if
+		// if the end of a log message's path matches one of the arrays below reversed, the message is printed only if
 		// the log level of the message is equal to or higher than the level specified here
 		
 //		new IgnoreEntry(Level.DEBUG, InterserviceChannel.class), // show all log messages from InterserviceChannel instances only

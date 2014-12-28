@@ -4,38 +4,56 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
+import java.util.HashSet;
+import java.util.LinkedList;
 
 import org.dclayer.DCL;
 import org.dclayer.crypto.Crypto;
+import org.dclayer.crypto.challenge.CryptoChallenge;
+import org.dclayer.crypto.challenge.Fixed128ByteCryptoChallenge;
+import org.dclayer.crypto.key.Key;
 import org.dclayer.crypto.key.KeyPair;
+import org.dclayer.crypto.key.RemoteRSAKey;
 import org.dclayer.exception.crypto.CryptoException;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
+import org.dclayer.net.NeighborRequest;
 import org.dclayer.net.a2s.message.DataMessageI;
 import org.dclayer.net.a2s.message.RevisionMessageI;
 import org.dclayer.net.a2s.message.SlotAssignMessageI;
+import org.dclayer.net.a2s.remotekey.ApplicationConnectionRemoteRSAKeyInterface;
+import org.dclayer.net.a2s.remotekey.RemoteRSAKeyCommunicationInterface;
+import org.dclayer.net.a2s.remotekey.RemoteRSAKeyCommunicationListener;
 import org.dclayer.net.a2s.rev0.Rev0Message;
 import org.dclayer.net.a2s.rev35.Rev35Message;
 import org.dclayer.net.address.Address;
 import org.dclayer.net.buf.StreamByteBuf;
+import org.dclayer.net.component.AbsKeyComponent;
 import org.dclayer.net.componentinterface.AbsKeyComponentI;
+import org.dclayer.net.crisp.CrispPacket;
+import org.dclayer.net.crisp.message.NeighborRequestCrispMessageI;
+import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.network.ApplicationNetworkInstance;
+import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkInstanceCollection;
 import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
-import org.dclayer.net.network.slot.NetworkSlot;
-import org.dclayer.net.network.slot.NetworkSlotMap;
+import org.dclayer.net.network.slot.GenericNetworkSlot;
+import org.dclayer.net.network.slot.GenericNetworkSlotMap;
+import org.dclayer.threadswitch.ThreadEnvironment;
+import org.dclayer.threadswitch.ThreadExecutor;
+import org.dclayer.threadswitch.ThreadSwitch;
 
 /**
  * a connection to an application instance
  */
-public class ApplicationConnection extends Thread implements A2SMessageReceiver, HierarchicalLevel {
+public class ApplicationConnection extends Thread implements A2SMessageReceiver, RemoteRSAKeyCommunicationInterface, HierarchicalLevel {
 	
 	private Socket socket;
 	
@@ -50,10 +68,11 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	private final Rev35Message receiveRev35Message = new Rev35Message();
 	private final Rev35Message sendRev35Message = new Rev35Message();
 	
-	private A2SMessage receiveMessage = receiveRev35Message;
+	private ThreadSwitch<A2SMessage> receiveThreadSwitch;
+	
 	private A2SMessage sendMessage = sendRev35Message;
 	
-	private NetworkSlotMap networkSlotMap = new NetworkSlotMap();
+	private GenericNetworkSlotMap<ApplicationNetworkInstance> networkSlotMap = new GenericNetworkSlotMap<>();
 	
 	//
 	
@@ -61,6 +80,14 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	
 	private KeyPair applicationAddressKeyPair = null;
 	private Address applicationAddress = null;
+	
+	private LinkedList<NetworkType> networksToJoin = new LinkedList<>();
+	
+	private RemoteRSAKeyCommunicationListener remoteRSAKeyCommunicationListener;
+	
+	private boolean ignoreNeighborRequests = false;
+	
+	private HashSet<NeighborRequest> requestedNeighbors = new HashSet<>();
 	
 	/**
 	 * create a new {@link ApplicationConnection} for the given {@link TCPSocketConnection}
@@ -95,10 +122,19 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		
 	}
 	
-	public void setApplicationAddressKeyPair(KeyPair applicationAddressKeyPair) {
+	public synchronized void setApplicationAddressKeyPair(KeyPair applicationAddressKeyPair) {
+		
 		this.applicationAddressKeyPair = applicationAddressKeyPair;
 		this.applicationAddress = new Address(applicationAddressKeyPair, new NetworkInstanceCollection());
+		
 		applicationConnectionActionListener.onAddress(applicationAddress);
+		
+		for(NetworkType networkType : networksToJoin) {
+			joinNetwork(networkType);
+		}
+		
+		networksToJoin = null;
+		
 	}
 	
 	private void generateKeyPair() {
@@ -107,7 +143,7 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		Log.msg(this, "generated %d bits rsa address key pair", this.applicationAddressKeyPair.getPublicKey().getNumBits());
 	}
 	
-	private void onForward(NetworkPayload networkPayload, NetworkSlot networkSlot, NetworkPacket networkPacket) {
+	private void onForward(NetworkPayload networkPayload, GenericNetworkSlot<? extends NetworkNode> networkSlot, NetworkPacket networkPacket, NetworkInstance networkInstance) {
 		
 		Log.debug(this, "received NetworkPacket: %s", networkPacket.represent(true));
 		
@@ -121,25 +157,36 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 			return;
 		}
 		
-		if(networkPayload.destinedForService()) {
-			// TODO
+		if(networkPayload.isDestinedForService()) {
+			Log.debug(this, "delivering network payload destined for service: %s", networkPayload.represent(true));
+			applicationConnectionActionListener.onServiceNetworkPayload(networkPayload, networkInstance);
 		} else {
-			Log.debug(this, "sending data message to application containing network payload: %s", networkPayload.represent(true));
+			Log.debug(this, "sending data message to application, network payload: %s", networkPayload.represent(true));
 			sendDataMessage(networkSlot.getSlot(), networkPayload);
 		}
 		
 	}
 	
-	private void joinNetwork(final NetworkType networkType) {
+	private synchronized void joinNetwork(final NetworkType networkType) {
+		
+		if(applicationAddress == null) {
+			networksToJoin.add(networkType);
+			return;
+		}
 		
 		final NetworkPayload inNetworkPayload = networkType.makeInNetworkPayload(null);
 		
 		ApplicationNetworkInstance applicationNetworkInstance = new ApplicationNetworkInstance(this, networkType, applicationAddress) {
 			@Override
-			public synchronized boolean onForward(NetworkPacket networkPacket, NetworkSlot networkSlot) {
+			public synchronized boolean onForward(NetworkPacket networkPacket, GenericNetworkSlot<? extends NetworkNode> networkSlot) {
 				inNetworkPayload.setReadDataComponent(networkPacket.getDataComponent());
-				ApplicationConnection.this.onForward(inNetworkPayload, networkSlot, networkPacket);
+				ApplicationConnection.this.onForward(inNetworkPayload, networkSlot, networkPacket, this);
 				return true;
+			}
+
+			@Override
+			public void neighborRequest(Key senderPublicKey, String actionIdentifier, LLA senderLLA, boolean response) {
+				onNeighborRequest(this, senderPublicKey, actionIdentifier, senderLLA, response);
 			}
 		};
 		
@@ -147,7 +194,7 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		
 		applicationConnectionActionListener.onNetworkInstance(applicationNetworkInstance);
 		
-		NetworkSlot networkSlot = networkSlotMap.add(networkType);
+		GenericNetworkSlot<ApplicationNetworkInstance> networkSlot = networkSlotMap.add(networkType);
 		networkSlot.addNetworkNode(applicationNetworkInstance);
 		applicationNetworkInstance.setNetworkSlot(networkSlot);
 		
@@ -158,15 +205,102 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		
 		applicationNetworkInstance.setOutNetworkPayload(commonNetworkPayloadProperties);
 		
+		applicationNetworkInstance.setOutCrispPacket();
+		
 		Log.msg(this, "joined network: %s", networkSlot);
 		
 		sendSlotAssignMessage(networkSlot.getSlot(), networkType, applicationNetworkInstance.getScaledAddress());
 		
 	}
 	
+	//
+	
+	public void onNeighborRequest(ApplicationNetworkInstance applicationNetworkInstance, Key senderPublicKey, String actionIdentifier, LLA senderLLA, boolean response) {
+		
+		if(requestedNeighbors.contains(new NeighborRequest(senderPublicKey, actionIdentifier))) {
+			
+			Log.debug(this, "got neighbor request response: actionIdentifier=%s, senderLLA=%s", actionIdentifier, senderLLA);
+			
+			Address remoteAddress = new Address<>(KeyPair.fromPublicKey(senderPublicKey));
+			
+			if(response) {
+				
+//				todo_initiate_connection();
+				Log.msg(this, "TODO: initiate direct connection");
+				
+			} else {
+				
+				Log.debug(this, "repeating neighbor request");
+				sendNeighborRequest(applicationNetworkInstance, remoteAddress, actionIdentifier, true);
+				
+			}
+			
+			return;
+			
+		}
+		
+		if(ignoreNeighborRequests) {
+			Log.debug(this, "ignoring neighbor request: actionIdentifier=%s, senderLLA=%s", actionIdentifier, senderLLA);
+			return;
+		}
+		
+		Log.debug(this, "forwarding neighbor request to application: actionIdentifier=%s, senderLLA=%s", actionIdentifier, senderLLA);
+		
+		Log.msg(this, "TODO: forward neighbor request to app");
+		
+	}
+	
+	//
+	
 	@Override
 	public void run() {
+		
+		{
+		
+			Rev35Message tempReceiveMessage = new Rev35Message();
+			
+			for(;;) {
+				
+				try {
+					tempReceiveMessage.read(streamByteBuf);
+				} catch (ParseException e) {
+					Log.exception(this, e);
+					close();
+					return;
+				} catch (BufException e) {
+					Log.exception(this, e);
+					close();
+					return;
+				}
+				
+				if(tempReceiveMessage.getType() != Rev35Message.REVISION && tempReceiveMessage.getType() != Rev35Message.REVISION_BINARY) {
+					Log.warning(this, "ignoring application to service message (first message must be revision message): %s", tempReceiveMessage.represent(true));
+				}
+				
+				Log.debug(this, "received revision application to service message: %s", tempReceiveMessage.represent(true));
+				
+				tempReceiveMessage.callOnReceiveMethod(this);
+				break;
+				
+			}
+			
+		}
+		
+		ThreadExecutor<A2SMessage> threadExecutor = new ThreadExecutor<A2SMessage>() {
+
+			@Override
+			public void exec(ThreadEnvironment<A2SMessage> threadEnvironment, A2SMessage message) {
+				message.callOnReceiveMethod(ApplicationConnection.this);
+			}
+			
+		};
+		
 		for(;;) {
+			
+			ThreadEnvironment<A2SMessage> threadEnvironment = receiveThreadSwitch.get();
+			A2SMessage receiveMessage = threadEnvironment.getObject();
+			
+			Log.debug(this, "using thread: %s", threadEnvironment);
 			
 			try {
 				receiveMessage.read(streamByteBuf);
@@ -182,9 +316,10 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 			
 			Log.debug(this, "received application to service message: %s", receiveMessage.represent(true));
 			
-			receiveMessage.callOnReceiveMethod(this);
+			threadEnvironment.exec(threadExecutor);
 			
 		}
+		
 	}
 	
 	private void close() {
@@ -206,7 +341,7 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	
 	//
 	
-	private void sendNetworkPacket(NetworkSlot networkSlot, Data addressData, Data data) {
+	private void sendNetworkPacket(GenericNetworkSlot<? extends NetworkNode> networkSlot, Data addressData, Data data) {
 		
 		NetworkNode networkNode = networkSlot.getNetworkNodes().get(0);
 
@@ -216,16 +351,57 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		synchronized(networkNode) {
 			
 			networkPacket.setDestinationAddressData(addressData);
+			networkPayload.setDestinedForService(false);
+			
 			networkPayload.setPayloadData(data);
 			
 			try {
-				networkPayload.write(networkPacket.getDataComponent());
+//				networkPayload.write(networkPacket.getDataComponent());
+				networkPacket.getDataComponent().setData(networkPayload);
 			} catch (BufException e) {
 				Log.exception(this, e, "could not write network packet payload");
 				return;
 			}
 			
 			networkNode.forward(networkPacket);
+			
+		}
+		
+	}
+	
+	private void sendNeighborRequest(ApplicationNetworkInstance applicationNetworkInstance, Address destinationAddress, String actionIdentifier, boolean response) {
+		
+		GenericNetworkSlot<? extends NetworkNode> networkSlot = applicationNetworkInstance.getNetworkSlot();
+
+		NetworkPacket networkPacket = networkSlot.getNetworkPacket();
+		NetworkPayload networkPayload = applicationNetworkInstance.getOutNetworkPayload();
+		
+		CrispPacket crispPacket = applicationNetworkInstance.getOutCrispPacket();
+		
+		Data destinationAddressData = applicationNetworkInstance.getNetworkType().scaleAddress(destinationAddress);
+		
+		synchronized(applicationNetworkInstance) {
+			
+			networkPacket.setDestinationAddressData(destinationAddressData);
+			networkPayload.setDestinedForService(true);
+			
+			NeighborRequestCrispMessageI neighborRequestCrispMessage = crispPacket.setNeighborRequestCrispMessage();
+			neighborRequestCrispMessage.setKeyPair(this.applicationAddressKeyPair);
+			neighborRequestCrispMessage.setActionIdentifier(actionIdentifier);
+			neighborRequestCrispMessage.setSenderLLA(applicationConnectionActionListener.getLocalLLA());
+			neighborRequestCrispMessage.setResponse(response);
+			
+			try {
+				networkPayload.setPayloadData(crispPacket);
+				networkPacket.getDataComponent().setData(networkPayload);
+			} catch (BufException e) {
+				Log.exception(this, e, "could not write network packet payload");
+				return;
+			}
+			
+			Log.debug(this, "sending neighbor request network packet: %s", networkPacket.represent(true));
+			
+			applicationNetworkInstance.forward(networkPacket);
 			
 		}
 		
@@ -255,6 +431,16 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		send();
 	}
 	
+	private synchronized void sendKeyEncryptMessage(Data plainData) {
+		sendMessage.setKeyEncryptDataMessage().getPlainDataComponent().setData(plainData);
+		send();
+	}
+	
+	private synchronized void sendKeyDecryptMessage(Data cipherData) {
+		sendMessage.setKeyDecryptDataMessage().getCipherDataComponent().setData(cipherData);
+		send();
+	}
+	
 	//
 	
 	public synchronized void onReceiveRevisionMessage(int revision) {
@@ -266,12 +452,12 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		switch(revision) {
 		case 0: {
 			this.sendMessage = sendRev0Message;
-			this.receiveMessage = receiveRev0Message;
+			this.receiveThreadSwitch = new ThreadSwitch<A2SMessage>(Rev0Message.class);
 			break;
 		}
 		case 35: {
 			this.sendMessage = sendRev35Message;
-			this.receiveMessage = receiveRev35Message;
+			this.receiveThreadSwitch = new ThreadSwitch<A2SMessage>(Rev35Message.class);
 			break;
 		}
 		default: {
@@ -290,7 +476,7 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		
 		Log.debug(this, "onReceiveDataMessage(%d, %s, %s)", slot, addressData, data);
 		
-		NetworkSlot networkSlot = networkSlotMap.get(slot);
+		GenericNetworkSlot<? extends NetworkNode> networkSlot = networkSlotMap.get(slot);
 		
 		if(networkSlot == null) {
 			Log.warning(this, "received data message for empty network slot %d", slot);
@@ -317,12 +503,35 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	
 	@Override
 	public void onReceiveAddressPublicKeyMessage(AbsKeyComponentI absKeyComponentI) {
+		
 		Log.debug(this, "onReceiveAddressPublicKeyMessage(%s)", absKeyComponentI);
+		
 		try {
-			setApplicationAddressKeyPair(KeyPair.fromPublicKey(absKeyComponentI.getKey()));
+			
+			final Key publicKey = absKeyComponentI.getKey();
+			final RemoteRSAKey privateKey = new RemoteRSAKey(new ApplicationConnectionRemoteRSAKeyInterface(publicKey.getNumBits(), this));
+			
+			// lets confirm this right away
+			final CryptoChallenge challengingCryptoChallenge = new Fixed128ByteCryptoChallenge(publicKey);
+			final CryptoChallenge solvingCryptoChallenge = new Fixed128ByteCryptoChallenge(privateKey);
+			final Data plainData = challengingCryptoChallenge.makeRandomPlainData();
+			
+			Data cipherData = solvingCryptoChallenge.solveCryptoChallenge(plainData);
+			if(!challengingCryptoChallenge.verifyCipherData(cipherData)) {
+				Log.warning(ApplicationConnection.this, "the application could not pass the crypto challenge for the public key it provided");
+				// TODO react
+			} else {
+				Log.debug(ApplicationConnection.this, "application successfully completed crypto challenge for public key provided");
+			}
+
+			setApplicationAddressKeyPair(KeyPair.fromKeys(publicKey, privateKey));
+			
 		} catch (CryptoException e) {
+			
 			Log.exception(this, e);
+			
 		}
+		
 	}
 
 	@Override
@@ -331,6 +540,63 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		for(NetworkType networkType : DCL.DEFAULT_NETWORK_TYPES) {
 			joinNetwork(networkType);
 		}
+	}
+
+	@Override
+	public void onReceiveKeyEncryptDataMessage(Data plainData) {
+		// TODO illegal
+	}
+
+	@Override
+	public void onReceiveKeyDecryptDataMessage(Data cipherData) {
+		// TODO illegal
+	}
+	
+	@Override
+	public void onReceiveKeyCryptoResponseDataMessage(Data responseData) {
+		Log.debug(this, "received key crypto response data: %s", responseData);
+		if(this.remoteRSAKeyCommunicationListener != null) this.remoteRSAKeyCommunicationListener.onResponseDataMessage(responseData);
+	}
+	
+	@Override
+	public void onReceiveApplicationChannelRequestMessage(int networkSlotId, int channelSlotId, AbsKeyComponent keyComponent) {
+		
+		Log.debug(this, "received application channel request for network slot %d and channel slot %d", networkSlotId, channelSlotId);
+		
+		// TODO
+		
+		Key publicKey;
+		try {
+			publicKey = keyComponent.getKey();
+		} catch (CryptoException e) {
+			Log.exception(this, e);
+			return;
+		}
+		
+		GenericNetworkSlot<ApplicationNetworkInstance> networkSlot = networkSlotMap.get(networkSlotId);
+		ApplicationNetworkInstance applicationNetworkInstance = networkSlot.getNetworkNodes().get(0);
+		
+		sendNeighborRequest(applicationNetworkInstance, new Address<>(KeyPair.fromPublicKey(publicKey)), DCL.ACTION_IDENTIFIER_APPLICATION_CHANNEL, false);
+		
+	}
+	
+	//
+
+	@Override
+	public void setRemoteRSAKeyCommunicationListener(RemoteRSAKeyCommunicationListener remoteRSAKeyCommunicationListener) {
+		this.remoteRSAKeyCommunicationListener = remoteRSAKeyCommunicationListener;
+	}
+
+	@Override
+	public void sendEncryptMessage(Data plainData) {
+		Log.debug(this, "sending key encrypt data message for plain data: %s", plainData);
+		sendKeyEncryptMessage(plainData);
+	}
+
+	@Override
+	public void sendDecryptMessage(Data cipherData) {
+		Log.debug(this, "sending key decrypt data message for cipher data: %s", cipherData);
+		sendKeyDecryptMessage(cipherData);
 	}
 	
 	//

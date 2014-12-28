@@ -1,9 +1,11 @@
 package org.dclayer.net.network;
 
+import org.dclayer.crypto.key.Key;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
 import org.dclayer.net.address.Address;
+import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.routing.Nexthops;
 import org.dclayer.net.network.routing.RoutingTable;
@@ -52,5 +54,7 @@ public abstract class NetworkInstance extends NetworkNode<Object> implements Hie
 	public HierarchicalLevel getParentHierarchicalLevel() {
 		return parentHierarchicalLevel;
 	}
+	
+	public abstract void neighborRequest(Key senderPublicKey, String actionIdentifier, LLA senderLLA, boolean response);
 	
 }

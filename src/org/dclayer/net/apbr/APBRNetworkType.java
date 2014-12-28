@@ -6,13 +6,13 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.Data;
 import org.dclayer.net.address.Address;
 import org.dclayer.net.network.NetworkInstance;
+import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
-import org.dclayer.net.network.routing.ForwardDestination;
 import org.dclayer.net.network.routing.RoutingTable;
-import org.dclayer.net.network.slot.NetworkSlot;
+import org.dclayer.net.network.slot.GenericNetworkSlot;
 
 
 public class APBRNetworkType extends NetworkType<APBRNetworkType> {
@@ -82,7 +82,7 @@ public class APBRNetworkType extends NetworkType<APBRNetworkType> {
 	}
 
 	@Override
-	public NetworkPacket makeNetworkPacket(NetworkSlot networkSlot) {
+	public NetworkPacket makeNetworkPacket(GenericNetworkSlot<NetworkNode> networkSlot) {
 		return new APBRPacket(networkSlot, this);
 	}
 

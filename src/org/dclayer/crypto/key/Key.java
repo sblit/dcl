@@ -5,19 +5,16 @@ import org.dclayer.exception.crypto.CryptoException;
 import org.dclayer.exception.crypto.InsufficientKeySizeException;
 import org.dclayer.net.Data;
 
-public abstract class Key<T> {
+public abstract class Key {
 	
 	public static final byte RSA = 0;
 	
 	//
 	
-	protected final T key;
 	private int numBits = -1;
 	
-	public Key(T key) throws InsufficientKeySizeException {
-		this.key = key;
-		
-		this.numBits = computeNumBits();
+	public Key(int numBits) throws InsufficientKeySizeException {
+		this.numBits = numBits;
 		if(numBits < Crypto.KEY_MIN_NUMBITS) throw new InsufficientKeySizeException();
 	}
 	
@@ -26,18 +23,29 @@ public abstract class Key<T> {
 	}
 	
 	public abstract int getType();
-	protected abstract int computeNumBits();
 	
 	public abstract int getMaxBlockNumBits();
 	
 	public abstract Data encrypt(Data plainData) throws CryptoException;
 	public abstract Data decrypt(Data cipherData) throws CryptoException;
 	
+	public abstract int getBlockNumBytes();
+	
 	public abstract Data toData();
 	
 	@Override
 	public abstract String toString();
 	
-	public abstract boolean equals(Key<?> key);
+	@Override
+	public abstract int hashCode();
+	
+	public abstract boolean equals(Key key);
+	
+	@Override
+	public boolean equals(Object o) {
+		if(this == o) return true;
+		if(!(o instanceof Key)) return false;
+		return equals((Key) o);
+	}
 	
 }

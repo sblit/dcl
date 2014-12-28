@@ -10,14 +10,17 @@ import org.dclayer.exception.crypto.InsufficientKeySizeException;
 import org.dclayer.exception.crypto.InvalidCipherCryptoException;
 import org.dclayer.net.Data;
 
-public abstract class RSAKey extends Key<RSAKeyParameters> {
+public abstract class RSAKey extends Key {
+	
+	private RSAKeyParameters rsaKeyParameters;
 	
 	public RSAKey(boolean isPrivate, final BigInteger modulus, final BigInteger exponent) throws InsufficientKeySizeException {
-		super(new RSAKeyParameters(isPrivate, modulus, exponent));
+		this(new RSAKeyParameters(isPrivate, modulus, exponent));
 	}
 	
 	public RSAKey(RSAKeyParameters rsaKeyParameters) throws InsufficientKeySizeException {
-		super(rsaKeyParameters);
+		super(rsaKeyParameters.getModulus().bitLength());
+		this.rsaKeyParameters = rsaKeyParameters;
 	}
 
 	@Override
@@ -26,36 +29,40 @@ public abstract class RSAKey extends Key<RSAKeyParameters> {
 	}
 
 	@Override
-	protected int computeNumBits() {
-		return key.getModulus().bitLength();
-	}
-
-	@Override
 	public int getMaxBlockNumBits() {
 		return getNumBits();
 	}
 	
+	@Override
+	public int getBlockNumBytes() {
+		return getNumBits()/8;
+	}
+	
 	public BigInteger getModulus() {
-		return key.getModulus();
+		return rsaKeyParameters.getModulus();
 	}
 	
 	public BigInteger getExponent() {
-		return key.getExponent();
+		return rsaKeyParameters.getExponent();
 	}
 	
 	@Override
 	public boolean equals(Key key) {
-		if(this == key) return true;
 		if(!(key instanceof RSAKey)) return false;
 		RSAKey rsaKey = (RSAKey) key;
 		return this.getExponent().equals(rsaKey.getExponent()) && this.getModulus().equals(rsaKey.getModulus());
 	}
 	
 	@Override
+	public int hashCode() {
+		return this.getExponent().hashCode() + this.getModulus().hashCode();
+	}
+	
+	@Override
 	public Data encrypt(Data plainData) throws InvalidCipherCryptoException {
 		
 		OAEPEncoding oaepEncoding = new OAEPEncoding(new RSAEngine());
-		oaepEncoding.init(true, key);
+		oaepEncoding.init(true, rsaKeyParameters);
         
 		byte[] cipherBytes;
 		try {
@@ -72,7 +79,7 @@ public abstract class RSAKey extends Key<RSAKeyParameters> {
 	public Data decrypt(Data cipherData) throws InvalidCipherCryptoException {
 		
 		OAEPEncoding oaepEncoding = new OAEPEncoding(new RSAEngine());
-		oaepEncoding.init(false, key);
+		oaepEncoding.init(false, rsaKeyParameters);
         
 		byte[] cipherBytes;
         try {

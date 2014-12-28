@@ -7,7 +7,7 @@ import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.network.component.NetworkPacket;
-import org.dclayer.net.network.slot.NetworkSlot;
+import org.dclayer.net.network.slot.GenericNetworkSlot;
 
 public class CirclePacket extends NetworkPacket {
 	
@@ -18,7 +18,7 @@ public class CirclePacket extends NetworkPacket {
 	
 	private DataComponent dataComponent = new DataComponent();
 	
-	public CirclePacket(NetworkSlot networkSlot, CircleNetworkType circleNetworkType) {
+	public CirclePacket(GenericNetworkSlot networkSlot, CircleNetworkType circleNetworkType) {
 		super(networkSlot);
 		this.circleNetworkType = circleNetworkType;
 		this.addressData = this.ownAddressData = new Data(circleNetworkType.getAddressNumBytes());

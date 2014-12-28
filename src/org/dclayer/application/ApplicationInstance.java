@@ -6,17 +6,23 @@ import java.net.Socket;
 
 import org.dclayer.application.exception.ConnectionException;
 import org.dclayer.application.exception.RevisionNegotiationConnectionException;
+import org.dclayer.application.networktypeslotmap.NetworkEndpointSlot;
 import org.dclayer.application.networktypeslotmap.NetworkEndpointSlotMap;
+import org.dclayer.crypto.key.Key;
 import org.dclayer.crypto.key.KeyPair;
 import org.dclayer.crypto.key.RSAKey;
+import org.dclayer.exception.crypto.InvalidCipherCryptoException;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.Data;
 import org.dclayer.net.a2s.A2SMessage;
 import org.dclayer.net.a2s.A2SMessageReceiver;
+import org.dclayer.net.a2s.message.ApplicationChannelRequestMessageI;
+import org.dclayer.net.a2s.message.DataMessageI;
 import org.dclayer.net.a2s.rev0.Rev0Message;
 import org.dclayer.net.address.Address;
 import org.dclayer.net.buf.StreamByteBuf;
+import org.dclayer.net.component.AbsKeyComponent;
 import org.dclayer.net.componentinterface.AbsKeyComponentI;
 import org.dclayer.net.network.NetworkType;
 
@@ -176,6 +182,38 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 		send();
 	}
 	
+	private synchronized void sendDataMessage(NetworkEndpointSlot networkEndpointSlot, Data destinationAddressData, Data data) {
+		DataMessageI dataMessageI = sendMessage.setDataMessage();
+		dataMessageI.getSlotNumComponent().setNum(networkEndpointSlot.getSlot());
+		dataMessageI.getAddressComponent().setAddressData(destinationAddressData);
+		dataMessageI.getDataComponent().setData(data);
+		send();
+	}
+	
+	private synchronized void sendKeyCryptoResponseDataMessage(Data responseData) {
+		sendMessage.setKeyCryptoResponseDataMessage().getResponseDataComponent().setData(responseData);
+		send();
+	}
+	
+	private synchronized void sendApplicationChannelRequestMessage(int networkSlotId, int channelSlotId, Key remotePublicKey) {
+		ApplicationChannelRequestMessageI applicationChannelRequestMessage = sendMessage.setApplicationChannelRequestMessage();
+		applicationChannelRequestMessage.setNetworkSlot(networkSlotId);
+		applicationChannelRequestMessage.setChannelSlot(channelSlotId);
+		applicationChannelRequestMessage.getKeyComponent().setKey(remotePublicKey);
+		send();
+	}
+	
+	//
+	
+	public void send(NetworkEndpointSlot networkEndpointSlot, Data destinationAddressData, Data data) {
+		sendDataMessage(networkEndpointSlot, destinationAddressData, data);
+	}
+	
+	public void requestApplicationChannel(NetworkEndpointSlot networkEndpointSlot, Key remotePublicKey) {
+		sendApplicationChannelRequestMessage(networkEndpointSlot.getSlot(), 0 /* TODO */, remotePublicKey);
+		// TODO
+	}
+	
 	//
 
 	@Override
@@ -186,8 +224,9 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 
 	@Override
 	public void onReceiveDataMessage(int slot, Data addressData, Data data) {
-		NetworkEndpoint networkEndpoint = networkEndpointSlotMap.get(slot).getNetworkEndpoint();
-		networkEndpoint.getOnReceiveListener().onReceive(networkEndpoint.getNetworkType(), data, addressData);
+		NetworkEndpointSlot networkEndpointSlot = networkEndpointSlotMap.get(slot);
+		NetworkEndpoint networkEndpoint = networkEndpointSlot.getNetworkEndpoint();
+		networkEndpoint.getOnReceiveListener().onReceive(networkEndpointSlot, data, addressData);
 	}
 
 	@Override
@@ -203,8 +242,8 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	@Override
 	public void onReceiveSlotAssignMessage(int slot, NetworkType networkType, Data addressData) {
 		NetworkEndpoint networkEndpoint = new NetworkEndpoint(networkType, defaultNetworksOnReceiveListener);
-		networkEndpointSlotMap.put(slot, networkEndpoint);
-		networkEndpoint.getOnReceiveListener().onJoin(networkType, addressData);
+		NetworkEndpointSlot networkEndpointSlot = networkEndpointSlotMap.put(slot, networkEndpoint);
+		networkEndpoint.getOnReceiveListener().onJoin(networkEndpointSlot, addressData);
 	}
 
 	@Override
@@ -214,6 +253,40 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 
 	@Override
 	public void onReceiveJoinDefaultNetworksMessage() {
+		// TODO illegal
+	}
+
+	@Override
+	public void onReceiveKeyEncryptDataMessage(Data plainData) {
+		Data cipherData;
+		try {
+			cipherData = this.address.getKeyPair().getPrivateKey().encrypt(plainData);
+		} catch (InvalidCipherCryptoException e) {
+			// TODO
+			cipherData = null;
+		}
+		sendKeyCryptoResponseDataMessage(cipherData);
+	}
+
+	@Override
+	public void onReceiveKeyDecryptDataMessage(Data cipherData) {
+		Data plainData;
+		try {
+			plainData = this.address.getKeyPair().getPrivateKey().decrypt(cipherData);
+		} catch (InvalidCipherCryptoException e) {
+			// TODO
+			plainData = null;
+		}
+		sendKeyCryptoResponseDataMessage(plainData);
+	}
+
+	@Override
+	public void onReceiveKeyCryptoResponseDataMessage(Data responseData) {
+		// TODO illegal
+	}
+
+	@Override
+	public void onReceiveApplicationChannelRequestMessage(int networkSlotId, int channelSlotId, AbsKeyComponent keyComponent) {
 		// TODO illegal
 	}
 	

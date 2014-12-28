@@ -14,7 +14,7 @@ import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
 import org.dclayer.net.network.routing.RoutingTable;
-import org.dclayer.net.network.slot.NetworkSlot;
+import org.dclayer.net.network.slot.GenericNetworkSlot;
 
 public abstract class NetworkType<T extends NetworkType> extends PacketComponent {
 	
@@ -93,7 +93,7 @@ public abstract class NetworkType<T extends NetworkType> extends PacketComponent
 	public abstract int getAddressNumBytes();
 	
 	public abstract RoutingTable makeRoutingTable(NetworkInstance networkInstance);
-	public abstract NetworkPacket makeNetworkPacket(NetworkSlot networkSlot);
+	public abstract NetworkPacket makeNetworkPacket(GenericNetworkSlot<NetworkNode> networkSlot);
 	
 	public abstract NetworkPayload makeInNetworkPayload(CommonNetworkPayloadProperties commonNetworkPayloadProperties);
 	public abstract NetworkPayload makeOutNetworkPayload(Data sourceAddressData, CommonNetworkPayloadProperties commonNetworkPayloadProperties);

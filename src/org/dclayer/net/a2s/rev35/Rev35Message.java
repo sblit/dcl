@@ -8,7 +8,11 @@ import org.dclayer.net.a2s.A2SMessage;
 import org.dclayer.net.a2s.A2SMessageReceiver;
 import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
 import org.dclayer.net.a2s.message.AddressPublicKeyMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelRequestMessageI;
 import org.dclayer.net.a2s.message.JoinDefaultNetworksMessageI;
+import org.dclayer.net.a2s.message.KeyCryptoResponseDataMessageI;
+import org.dclayer.net.a2s.message.KeyDecryptDataMessageI;
+import org.dclayer.net.a2s.message.KeyEncryptDataMessageI;
 import org.dclayer.net.a2s.rev0.Rev0Message;
 import org.dclayer.net.a2s.rev35.message.DataMessage;
 import org.dclayer.net.a2s.rev35.message.GenerateKeyMessage;
@@ -121,6 +125,30 @@ public class Rev35Message extends A2SMessage {
 
 	@Override
 	public JoinDefaultNetworksMessageI setJoinDefaultNetworksMessage() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public KeyEncryptDataMessageI setKeyEncryptDataMessage() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public KeyDecryptDataMessageI setKeyDecryptDataMessage() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public KeyCryptoResponseDataMessageI setKeyCryptoResponseDataMessage() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public ApplicationChannelRequestMessageI setApplicationChannelRequestMessage() {
 		// TODO Auto-generated method stub
 		return null;
 	}

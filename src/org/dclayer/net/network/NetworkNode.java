@@ -2,6 +2,7 @@ package org.dclayer.net.network;
 
 import org.dclayer.net.Data;
 import org.dclayer.net.address.Address;
+import org.dclayer.net.crisp.CrispPacket;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
@@ -18,6 +19,8 @@ public abstract class NetworkNode<T> implements ForwardDestination<T> {
 	private T identifierObject;
 	
 	private NetworkPayload outNetworkPayload;
+	
+	private CrispPacket outCrispPacket;
 	
 	private boolean endpoint = false;
 	
@@ -54,6 +57,14 @@ public abstract class NetworkNode<T> implements ForwardDestination<T> {
 	
 	public NetworkPayload getOutNetworkPayload() {
 		return outNetworkPayload;
+	}
+	
+	public void setOutCrispPacket() {
+		this.outCrispPacket = new CrispPacket();
+	}
+	
+	public CrispPacket getOutCrispPacket() {
+		return outCrispPacket;
 	}
 	
 	public RoutingTable getRoutingTable() {

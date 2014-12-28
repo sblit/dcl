@@ -1,10 +1,9 @@
 package org.dclayer.net.a2s;
 
-import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
+import org.dclayer.net.component.AbsKeyComponent;
 import org.dclayer.net.componentinterface.AbsKeyComponentI;
 import org.dclayer.net.network.NetworkType;
-import org.dclayer.net.network.slot.NetworkSlot;
 
 public interface A2SMessageReceiver {
 
@@ -15,5 +14,9 @@ public interface A2SMessageReceiver {
 	public void onReceiveSlotAssignMessage(int slot, NetworkType networkType, Data addressData);
 	public void onReceiveAddressPublicKeyMessage(AbsKeyComponentI absKeyComponentI);
 	public void onReceiveJoinDefaultNetworksMessage();
+	public void onReceiveKeyEncryptDataMessage(Data plainData);
+	public void onReceiveKeyDecryptDataMessage(Data cipherData);
+	public void onReceiveKeyCryptoResponseDataMessage(Data responseData);
+	public void onReceiveApplicationChannelRequestMessage(int networkSlotId, int channelSlotId, AbsKeyComponent keyComponent);
 	
 }

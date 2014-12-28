@@ -12,7 +12,7 @@ import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
 import org.dclayer.net.network.routing.RoutingTable;
-import org.dclayer.net.network.slot.NetworkSlot;
+import org.dclayer.net.network.slot.GenericNetworkSlot;
 
 
 public class CircleNetworkType extends NetworkType<CircleNetworkType> {
@@ -71,7 +71,7 @@ public class CircleNetworkType extends NetworkType<CircleNetworkType> {
 	}
 
 	@Override
-	public NetworkPacket makeNetworkPacket(NetworkSlot networkSlot) {
+	public NetworkPacket makeNetworkPacket(GenericNetworkSlot networkSlot) {
 		return new CirclePacket(networkSlot, this);
 	}
 

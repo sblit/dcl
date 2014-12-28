@@ -1,6 +1,7 @@
 package org.dclayer.net.component;
 
 import org.dclayer.crypto.key.Key;
+import org.dclayer.crypto.key.RSAKey;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.exception.net.parse.UnsupportedKeyTypeException;
@@ -48,6 +49,12 @@ public class KeyComponent extends PacketComponent implements KeyComponentI {
 	@Override
 	public AbsKeyComponent getKeyComponent() {
 		return rsaKey;
+	}
+
+	@Override
+	public void setKey(Key key) {
+		// so far we only know RSA keys, so let's stick to that
+		rsaKey.setKey((RSAKey) key);
 	}
 
 }

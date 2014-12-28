@@ -6,6 +6,7 @@ import org.dclayer.exception.net.parse.UnsupportedMessageTypeException;
 import org.dclayer.exception.net.parse.WriteOnlyException;
 import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
+import org.dclayer.net.PacketComponentI;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.network.component.NetworkPayload;
@@ -106,9 +107,14 @@ public class CircleNetworkPayload extends NetworkPayload {
 	public String toString() {
 		return String.format("CircleNetworkPayload(destinedForService=%s, sourceAddress=%s)", destinedForService, sourceAddress ? sourceAddressData.toString() : "-");
 	}
+	
+	@Override
+	public void setDestinedForService(boolean destinedForService) {
+		this.destinedForService = destinedForService;
+	}
 
 	@Override
-	public boolean destinedForService() {
+	public boolean isDestinedForService() {
 		return destinedForService;
 	}
 
@@ -125,7 +131,16 @@ public class CircleNetworkPayload extends NetworkPayload {
 	@Override
 	public void setPayloadData(Data payloadData) {
 		payloadDataComponent.setData(payloadData);
+	}
 
+	@Override
+	public void setPayloadData(PacketComponentI packetComponent) throws BufException {
+		payloadDataComponent.setData(packetComponent);
+	}
+
+	@Override
+	public void getPayloadData(PacketComponentI packetComponent) throws BufException, ParseException {
+		payloadDataComponent.getData(packetComponent);
 	}
 
 }

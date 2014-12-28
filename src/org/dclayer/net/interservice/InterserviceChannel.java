@@ -9,7 +9,6 @@ import org.dclayer.crypto.key.Key;
 import org.dclayer.crypto.key.KeyPair;
 import org.dclayer.crypto.key.RSAKey;
 import org.dclayer.exception.crypto.CryptoException;
-import org.dclayer.exception.crypto.InsufficientKeySizeException;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
@@ -39,6 +38,7 @@ import org.dclayer.net.network.RemoteNetworkNode;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.slot.AddressSlot;
 import org.dclayer.net.network.slot.AddressSlotMap;
+import org.dclayer.net.network.slot.GenericNetworkSlot;
 import org.dclayer.net.network.slot.NetworkSlot;
 import org.dclayer.net.network.slot.NetworkSlotMap;
 
@@ -119,7 +119,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 			
 		}
 		
-		NetworkSlot localNetworkSlot = remoteNetworkSlot.getRemoteEquivalent();
+		GenericNetworkSlot localNetworkSlot = remoteNetworkSlot.getRemoteEquivalent();
 		if(localNetworkSlot != null) {
 			remoteNetworkSlot.setRemoteEquivalent(null);
 			localNetworkSlot.setRemoteEquivalent(null);
@@ -135,7 +135,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 			
 			Log.msg(this, "remote network slot %s is empty, removing", remoteNetworkSlot);
 			
-			NetworkSlot localNetworkSlot = remoteNetworkSlot.getRemoteEquivalent();
+			GenericNetworkSlot localNetworkSlot = remoteNetworkSlot.getRemoteEquivalent();
 			if(localNetworkSlot != null) {
 				remoteNetworkSlot.setRemoteEquivalent(null);
 				localNetworkSlot.setRemoteEquivalent(null);
@@ -472,7 +472,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	
 	private void onReceiveNetworkPacket(NetworkPacket networkPacket) {
 		
-		NetworkSlot localNetworkSlot = networkPacket.getNetworkSlot();
+		GenericNetworkSlot<NetworkNode> localNetworkSlot = networkPacket.getNetworkSlot();
 		if(localNetworkSlot.getRemoteEquivalent() == null) {
 			// remote peer sends to our network slot even though itself didn't join that network
 			Log.warning(this, "ignoring network packet on network slot %s, remote did not join that network", localNetworkSlot);
@@ -541,8 +541,8 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		Key key;
 		try {
 			key = trustedSwitchInterserviceMessage.getKeyComponent().getKeyComponent().getKey();
-		} catch (InsufficientKeySizeException e) {
-			Log.exception(this, e, "could not parse trusted switch message for address slot %d, insufficient key size", addressSlotId);
+		} catch (CryptoException e) {
+			Log.exception(this, e, "could not parse trusted switch message for address slot %d, crypto exception while parsing key", addressSlotId);
 			// TODO notify remote of failure
 			return;
 		}

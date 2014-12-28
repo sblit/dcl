@@ -10,7 +10,10 @@ import java.util.List;
 
 import org.dclayer.PreLinkCommunicationManager.Result;
 import org.dclayer.crypto.Crypto;
+import org.dclayer.crypto.key.Key;
 import org.dclayer.crypto.key.KeyPair;
+import org.dclayer.exception.net.buf.BufException;
+import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.listener.net.NetworkInstanceListener;
 import org.dclayer.listener.net.OnReceiveListener;
 import org.dclayer.meta.HierarchicalLevel;
@@ -20,6 +23,9 @@ import org.dclayer.net.a2s.ApplicationConnection;
 import org.dclayer.net.a2s.ApplicationConnectionActionListener;
 import org.dclayer.net.address.Address;
 import org.dclayer.net.buf.DataByteBuf;
+import org.dclayer.net.crisp.CrispMessageReceiver;
+import org.dclayer.net.crisp.CrispPacket;
+import org.dclayer.net.crisp.message.NeighborRequestCrispMessageI;
 import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.interservice.InterserviceChannelActionListener;
 import org.dclayer.net.link.Link;
@@ -28,22 +34,22 @@ import org.dclayer.net.link.LinkSendInterface;
 import org.dclayer.net.link.OnLinkActionListener;
 import org.dclayer.net.link.channel.data.DataChannel;
 import org.dclayer.net.llacache.CachedLLA;
+import org.dclayer.net.llacache.InetSocketLLA;
 import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.llacache.LLACache;
 import org.dclayer.net.lladatabase.LLADatabase;
-import org.dclayer.net.network.ApplicationNetworkInstance;
 import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkInstanceCollection;
 import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
+import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.routing.RoutingTable;
-import org.dclayer.net.network.slot.AddressSlot;
 import org.dclayer.net.network.slot.NetworkSlot;
 import org.dclayer.net.socket.TCPSocket;
 import org.dclayer.net.socket.UDPSocket;
 
-public class DCLService implements OnReceiveListener, NetworkInstanceListener, ApplicationConnectionActionListener, LinkSendInterface<CachedLLA>, OnLinkActionListener<CachedLLA>, InterserviceChannelActionListener, HierarchicalLevel {
+public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnReceiveListener, NetworkInstanceListener, ApplicationConnectionActionListener, LinkSendInterface<CachedLLA>, OnLinkActionListener<CachedLLA>, InterserviceChannelActionListener, HierarchicalLevel {
 	
 	/**
 	 * local UDPSocket, used for Service-to-Service communication
@@ -67,6 +73,9 @@ public class DCLService implements OnReceiveListener, NetworkInstanceListener, A
 	
 	private List<InterserviceChannel> interserviceChannels = new LinkedList<>();
 	private List<NetworkNode> networkNodes = new LinkedList<>();
+	
+	private DataByteBuf networkPayloadDataByteBuf = new DataByteBuf();
+	private CrispPacket inCrispPacket = new CrispPacket();
 	
 	public DCLService(int s2sPort, int a2sPort, LLADatabase llaDatabase) throws IOException {
 		
@@ -102,14 +111,29 @@ public class DCLService implements OnReceiveListener, NetworkInstanceListener, A
 	public void storeLLAs(List<LLA> llas) {
 		llaDatabase.store(llas);
 	}
+
+	@Override
+	public LLA getLocalLLA() {
+		// TODO
+		return new InetSocketLLA(InetAddress.getLoopbackAddress(), 0);
+	}
 	
 	public void join(NetworkType networkType) {
 		
+		final NetworkPayload inNetworkPayload = networkType.makeInNetworkPayload(null);
+		
 		NetworkInstance networkInstance = new NetworkInstance(this, networkType, localAddress, true) {
 			@Override
-			public boolean onForward(NetworkPacket networkPacket) {
+			public synchronized boolean onForward(NetworkPacket networkPacket) {
 				Log.msg(this, "received NetworkPacket: %s", networkPacket.represent(true));
+				inNetworkPayload.setReadDataComponent(networkPacket.getDataComponent());
+				DCLService.this.onForward(inNetworkPayload, this);
 				return true;
+			}
+
+			@Override
+			public void neighborRequest(Key senderPublicKey, String actionIdentifier, LLA senderLLA, boolean response) {
+				onNeighborRequest(this, senderPublicKey, actionIdentifier, senderLLA, response);
 			}
 		};
 		
@@ -117,6 +141,38 @@ public class DCLService implements OnReceiveListener, NetworkInstanceListener, A
 		onNetworkInstance(networkInstance);
 		
 		Log.msg(this, "joined network: %s", networkInstance);
+		
+	}
+	
+	private void onForward(NetworkPayload networkPayload, NetworkInstance networkInstance) {
+		
+		try {
+			
+			networkPayload.read();
+			
+		} catch (ParseException e) {
+			
+			Log.exception(this, e);
+			return;
+			
+		} catch (BufException e) {
+			
+			Log.exception(this, e);
+			return;
+			
+		}
+		
+		if(networkPayload.isDestinedForService()) {
+			
+			Log.debug(this, "received network payload destined for service: %s", networkPayload.represent(true));
+			onServiceNetworkPayload(networkPayload, networkInstance);
+			
+		} else {
+			
+			Log.debug(this, "service received network payload that is not destined for service, ignoring: ", networkPayload.represent(true));
+			// TODO
+			
+		}
 		
 	}
 	
@@ -174,6 +230,51 @@ public class DCLService implements OnReceiveListener, NetworkInstanceListener, A
 		for(InterserviceChannel interserviceChannel : interserviceChannels) {
 			interserviceChannel.joinNetwork(networkInstance);
 		}
+	}
+
+	@Override
+	public synchronized void onServiceNetworkPayload(NetworkPayload networkPayload, NetworkInstance networkInstance) {
+		
+		networkPayloadDataByteBuf.setData(networkPayload.getPayloadData());
+		
+		try {
+			
+			inCrispPacket.read(networkPayloadDataByteBuf);
+			
+		} catch (ParseException e) {
+			Log.exception(this, e);
+			return;
+		} catch (BufException e) {
+			Log.exception(this, e);
+			return;
+		}
+		
+		Log.debug(this, "crisp packet received: %s", inCrispPacket);
+		
+		inCrispPacket.getCrispMessage().callOnReceiveMethod(this, networkInstance);
+		
+	}
+
+	@Override
+	public void onReceiveNeighborRequestCrispMessage(NeighborRequestCrispMessageI neighborRequestCrispMessage, NetworkInstance networkInstance) {
+		
+		// TODO verify senderPublicKey!
+		
+		Key senderPublicKey = neighborRequestCrispMessage.getPublicKey();
+		String actionIdentifier = neighborRequestCrispMessage.getActionIdentifier();
+		LLA senderLLA = neighborRequestCrispMessage.getSenderLLA();
+		boolean response = neighborRequestCrispMessage.isResponse();
+		
+		networkInstance.neighborRequest(senderPublicKey, actionIdentifier, senderLLA, response);
+		
+	}
+	
+	//
+	
+	public void onNeighborRequest(NetworkInstance networkInstance, Key senderPublicKey, String actionIdentifier, LLA senderLLA, boolean response) {
+		
+		Log.debug(this, "ignoring neighbor request for service's address: actionIdentifier=%s senderLLA=%s", actionIdentifier, senderLLA);
+		
 	}
 	
 	@Override

@@ -6,8 +6,9 @@ import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.component.DataComponent;
+import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.component.NetworkPacket;
-import org.dclayer.net.network.slot.NetworkSlot;
+import org.dclayer.net.network.slot.GenericNetworkSlot;
 
 public class APBRPacket extends NetworkPacket {
 	
@@ -18,7 +19,7 @@ public class APBRPacket extends NetworkPacket {
 	
 	private DataComponent dataComponent = new DataComponent();
 	
-	public APBRPacket(NetworkSlot networkSlot, APBRNetworkType apbrNetworkType) {
+	public APBRPacket(GenericNetworkSlot<NetworkNode> networkSlot, APBRNetworkType apbrNetworkType) {
 		super(networkSlot);
 		this.apbrNetworkType = apbrNetworkType;
 		this.addressData = this.ownAddressData = new Data(apbrNetworkType.getAddressNumBytes());

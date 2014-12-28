@@ -3,7 +3,8 @@ package org.dclayer.net.network.component;
 import org.dclayer.net.Data;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.component.DataComponent;
-import org.dclayer.net.network.slot.NetworkSlot;
+import org.dclayer.net.network.NetworkNode;
+import org.dclayer.net.network.slot.GenericNetworkSlot;
 
 /**
  * Base class for all routed Packets (e.g. APBRPacket)
@@ -11,13 +12,13 @@ import org.dclayer.net.network.slot.NetworkSlot;
  */
 public abstract class NetworkPacket extends PacketComponent {
 	
-	private final NetworkSlot networkSlot;
+	private final GenericNetworkSlot<NetworkNode> networkSlot;
 	
-	public NetworkPacket(NetworkSlot networkSlot) {
+	public NetworkPacket(GenericNetworkSlot<NetworkNode> networkSlot) {
 		this.networkSlot = networkSlot;
 	}
 	
-	public final NetworkSlot getNetworkSlot() {
+	public final GenericNetworkSlot<NetworkNode> getNetworkSlot() {
 		return networkSlot;
 	}
 	
