@@ -5,9 +5,9 @@ import org.dclayer.net.network.NetworkType;
 public class NetworkEndpoint {
 	
 	private NetworkType networkType;
-	private OnReceiveListener onReceiveListener;
+	private NetworkEndpointSlotActionListener onReceiveListener;
 	
-	public NetworkEndpoint(NetworkType networkType, OnReceiveListener onReceiveListener) {
+	public NetworkEndpoint(NetworkType networkType, NetworkEndpointSlotActionListener onReceiveListener) {
 		this.networkType = networkType;
 		this.onReceiveListener = onReceiveListener;
 	}
@@ -16,7 +16,7 @@ public class NetworkEndpoint {
 		return networkType;
 	}
 	
-	public OnReceiveListener getOnReceiveListener() {
+	public NetworkEndpointSlotActionListener getOnReceiveListener() {
 		return onReceiveListener;
 	}
 	

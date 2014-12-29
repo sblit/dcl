@@ -3,6 +3,7 @@ package org.dclayer.net.a2s;
 import org.dclayer.net.Data;
 import org.dclayer.net.component.AbsKeyComponent;
 import org.dclayer.net.componentinterface.AbsKeyComponentI;
+import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.network.NetworkType;
 
 public interface A2SMessageReceiver {
@@ -17,6 +18,8 @@ public interface A2SMessageReceiver {
 	public void onReceiveKeyEncryptDataMessage(Data plainData);
 	public void onReceiveKeyDecryptDataMessage(Data cipherData);
 	public void onReceiveKeyCryptoResponseDataMessage(Data responseData);
-	public void onReceiveApplicationChannelRequestMessage(int networkSlotId, int channelSlotId, AbsKeyComponent keyComponent);
+	public void onReceiveApplicationChannelOutgoingRequestMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent);
+	public void onReceiveApplicationChannelIncomingRequestMessage(int networkSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA);
+	public void onReceiveApplicationChannelAcceptMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA);
 	
 }

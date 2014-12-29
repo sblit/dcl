@@ -1,11 +1,13 @@
 package org.dclayer.net.a2s;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.Set;
 
 import org.dclayer.DCL;
 import org.dclayer.crypto.Crypto;
@@ -21,6 +23,7 @@ import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
 import org.dclayer.net.NeighborRequest;
+import org.dclayer.net.a2s.message.ApplicationChannelIncomingRequestMessageI;
 import org.dclayer.net.a2s.message.DataMessageI;
 import org.dclayer.net.a2s.message.RevisionMessageI;
 import org.dclayer.net.a2s.message.SlotAssignMessageI;
@@ -87,8 +90,6 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	
 	private boolean ignoreNeighborRequests = false;
 	
-	private HashSet<NeighborRequest> requestedNeighbors = new HashSet<>();
-	
 	/**
 	 * create a new {@link ApplicationConnection} for the given {@link TCPSocketConnection}
 	 * @param tcpSocketConnection the {@link TCPSocketConnection} to create an {@link ApplicationConnection} for
@@ -110,7 +111,7 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		}
 		
 		try {
-			outputStream = socket.getOutputStream();
+			outputStream = new BufferedOutputStream(socket.getOutputStream());
 		} catch (IOException e) {
 			Log.exception(Log.PART_NET_TCPSOCKETCONNECTION, this, e);
 			return;
@@ -198,6 +199,8 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		networkSlot.addNetworkNode(applicationNetworkInstance);
 		applicationNetworkInstance.setNetworkSlot(networkSlot);
 		
+		applicationNetworkInstance.setRequestedNeighbors(new HashSet<NeighborRequest>());
+		
 		// TODO make these changeable for the connected application
 		CommonNetworkPayloadProperties commonNetworkPayloadProperties = new CommonNetworkPayloadProperties()
 				.destinedForService(false)
@@ -215,11 +218,13 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	
 	//
 	
-	public void onNeighborRequest(ApplicationNetworkInstance applicationNetworkInstance, Key senderPublicKey, String actionIdentifier, LLA senderLLA, boolean response) {
+	public synchronized void onNeighborRequest(ApplicationNetworkInstance applicationNetworkInstance, Key senderPublicKey, String fullActionIdentifier, LLA senderLLA, boolean response) {
 		
-		if(requestedNeighbors.contains(new NeighborRequest(senderPublicKey, actionIdentifier))) {
+		Set<NeighborRequest> requestedNeighbors = applicationNetworkInstance.getRequestedNeighbors();
+		
+		if(requestedNeighbors.contains(new NeighborRequest(senderPublicKey, fullActionIdentifier))) {
 			
-			Log.debug(this, "got neighbor request response: actionIdentifier=%s, senderLLA=%s", actionIdentifier, senderLLA);
+			Log.debug(this, "got neighbor request response: fullActionIdentifier=%s, senderLLA=%s", fullActionIdentifier, senderLLA);
 			
 			Address remoteAddress = new Address<>(KeyPair.fromPublicKey(senderPublicKey));
 			
@@ -231,7 +236,7 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 			} else {
 				
 				Log.debug(this, "repeating neighbor request");
-				sendNeighborRequest(applicationNetworkInstance, remoteAddress, actionIdentifier, true);
+				sendNeighborRequest(applicationNetworkInstance, remoteAddress, fullActionIdentifier, true);
 				
 			}
 			
@@ -239,14 +244,29 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 			
 		}
 		
-		if(ignoreNeighborRequests) {
-			Log.debug(this, "ignoring neighbor request: actionIdentifier=%s, senderLLA=%s", actionIdentifier, senderLLA);
+		if(ignoreNeighborRequests || response) {
+			Log.debug(this, "ignoring neighbor request%s: fullActionIdentifier=%s, senderLLA=%s", response ? " (unsolicited respons)" : "", fullActionIdentifier, senderLLA);
 			return;
 		}
 		
-		Log.debug(this, "forwarding neighbor request to application: actionIdentifier=%s, senderLLA=%s", actionIdentifier, senderLLA);
+		if(!fullActionIdentifier.startsWith(DCL.ACTION_IDENTIFIER_APPLICATION_CHANNEL_PREFIX)) {
+			Log.debug(this, "ignoring neighbor request, unknown action identifier: actionIdentifier=%s, senderLLA=%s", fullActionIdentifier, senderLLA);
+			return;
+		}
 		
-		Log.msg(this, "TODO: forward neighbor request to app");
+		String actionIdentifierSuffix = fullActionIdentifier.substring(DCL.ACTION_IDENTIFIER_APPLICATION_CHANNEL_PREFIX.length());
+		
+		Log.debug(this, "forwarding neighbor request to application: actionIdentifierSuffix=%s, senderLLA=%s", actionIdentifierSuffix, senderLLA);
+		
+		sendApplicationChannelIncomingRequestMessage(applicationNetworkInstance.getNetworkSlot().getSlot(), actionIdentifierSuffix, senderPublicKey, senderLLA);
+		
+	}
+	
+	private synchronized void requestNeighbor(ApplicationNetworkInstance applicationNetworkInstance, Address destinationAddress, String actionIdentifier, boolean response) {
+		
+		applicationNetworkInstance.getRequestedNeighbors().add(new NeighborRequest(destinationAddress.getKeyPair().getPublicKey(), actionIdentifier));
+		
+		sendNeighborRequest(applicationNetworkInstance, destinationAddress, actionIdentifier, false);
 		
 	}
 	
@@ -332,7 +352,7 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	
 	private void send() {
 		try {
-			sendMessage.write(streamByteBuf);
+			streamByteBuf.write(sendMessage);
 		} catch (BufException e) {
 			Log.exception(this, e, "error while sending application to service message %s", sendMessage.represent(true));
 			return;
@@ -386,7 +406,7 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 			networkPayload.setDestinedForService(true);
 			
 			NeighborRequestCrispMessageI neighborRequestCrispMessage = crispPacket.setNeighborRequestCrispMessage();
-			neighborRequestCrispMessage.setKeyPair(this.applicationAddressKeyPair);
+			neighborRequestCrispMessage.setKeyPair(applicationNetworkInstance.getAddress().getKeyPair());
 			neighborRequestCrispMessage.setActionIdentifier(actionIdentifier);
 			neighborRequestCrispMessage.setSenderLLA(applicationConnectionActionListener.getLocalLLA());
 			neighborRequestCrispMessage.setResponse(response);
@@ -438,6 +458,15 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	
 	private synchronized void sendKeyDecryptMessage(Data cipherData) {
 		sendMessage.setKeyDecryptDataMessage().getCipherDataComponent().setData(cipherData);
+		send();
+	}
+	
+	private synchronized void sendApplicationChannelIncomingRequestMessage(int networkSlotId, String actionIdentifierSuffix, Key remotePublicKey, LLA senderLLA) {
+		ApplicationChannelIncomingRequestMessageI applicationChannelIncomingRequestMessage = sendMessage.setApplicationChannelIncomingRequestMessage();
+		applicationChannelIncomingRequestMessage.setNetworkSlot(networkSlotId);
+		applicationChannelIncomingRequestMessage.setActionIdentifierSuffix(actionIdentifierSuffix);
+		applicationChannelIncomingRequestMessage.getKeyComponent().setKey(remotePublicKey);
+		applicationChannelIncomingRequestMessage.setSenderLLA(senderLLA);
 		send();
 	}
 	
@@ -559,11 +588,9 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	}
 	
 	@Override
-	public void onReceiveApplicationChannelRequestMessage(int networkSlotId, int channelSlotId, AbsKeyComponent keyComponent) {
+	public void onReceiveApplicationChannelOutgoingRequestMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent) {
 		
-		Log.debug(this, "received application channel request for network slot %d and channel slot %d", networkSlotId, channelSlotId);
-		
-		// TODO
+		Log.debug(this, "received application channel request for network slot %d and channel slot %d, actionIdentifierSuffix=%s", networkSlotId, channelSlotId, actionIdentifierSuffix);
 		
 		Key publicKey;
 		try {
@@ -576,7 +603,22 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		GenericNetworkSlot<ApplicationNetworkInstance> networkSlot = networkSlotMap.get(networkSlotId);
 		ApplicationNetworkInstance applicationNetworkInstance = networkSlot.getNetworkNodes().get(0);
 		
-		sendNeighborRequest(applicationNetworkInstance, new Address<>(KeyPair.fromPublicKey(publicKey)), DCL.ACTION_IDENTIFIER_APPLICATION_CHANNEL, false);
+		requestNeighbor(applicationNetworkInstance, new Address<>(KeyPair.fromPublicKey(publicKey)), DCL.ACTION_IDENTIFIER_APPLICATION_CHANNEL_PREFIX + actionIdentifierSuffix, false);
+		
+	}
+
+	@Override
+	public void onReceiveApplicationChannelIncomingRequestMessage(int networkSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA) {
+		
+		// TODO illegal
+		
+	}
+
+	@Override
+	public void onReceiveApplicationChannelAcceptMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA) {
+		
+		Log.debug(this, "received application channel accept message for network slot %d and channel slot %d, actionIdentifierSuffix=%s, senderLLA=%s", networkSlotId, channelSlotId, actionIdentifierSuffix, senderLLA);
+		
 		
 	}
 	

@@ -4,6 +4,7 @@ import java.nio.charset.Charset;
 
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.net.Data;
+import org.dclayer.net.PacketComponentI;
 
 /**
  * an abstract class defining methods to read and write data
@@ -207,6 +208,16 @@ public abstract class ByteBuf {
 	 */
 	public final void write(Data data) throws BufException {
 		this.write(data.getData(), data.offset(), data.length());
+	}
+	
+	/**
+	 * calls {@link PacketComponentI#write(ByteBuf)} on the given {@link PacketComponentI},
+	 * writing its contents to this {@link ByteBuf}
+	 * @param packetComponent the {@link PacketComponentI} to write
+	 * @throws BufException if this operation fails
+	 */
+	public void write(PacketComponentI packetComponent) throws BufException {
+		packetComponent.write(this);
 	}
 	
 	/**

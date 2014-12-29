@@ -48,7 +48,7 @@ public class NeighborRequestCrispMessage extends KeyEncryptedPacketComponent imp
 
 	@Override
 	public String plainToString() {
-		return String.format("NeighborRequestCrispMessage(actionIdentifier=%s, senderLLA=%s)", actionIdentifier, senderLLA);
+		return String.format("NeighborRequestCrispMessage(actionIdentifier=%s, senderLLA=%s, response=%s)", actionIdentifier, senderLLA, response);
 	}
 
 	@Override

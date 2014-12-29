@@ -4,10 +4,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.buf.BufNoReadException;
 import org.dclayer.exception.net.buf.BufNoWriteException;
 import org.dclayer.exception.net.buf.EndOfBufException;
 import org.dclayer.exception.net.buf.StreamBufIOException;
+import org.dclayer.net.PacketComponentI;
 
 /**
  * a {@link ByteBuf} implementation with an underlying {@link InputStream} and {@link OutputStream} 
@@ -48,6 +50,14 @@ public class StreamByteBuf extends ByteBuf {
 	public StreamByteBuf(OutputStream outputStream) {
 		this(null, outputStream);
 	}
+	
+	public InputStream getInputStream() {
+		return inputStream;
+	}
+	
+	public OutputStream getOutputStream() {
+		return outputStream;
+	}
 
 	@Override
 	public byte read() throws StreamBufIOException, BufNoReadException, EndOfBufException {
@@ -87,6 +97,23 @@ public class StreamByteBuf extends ByteBuf {
 		if(outputStream == null) throw new BufNoWriteException();
 		try {
 			outputStream.write(buf, offset, length);
+		} catch (IOException e) {
+			throw new StreamBufIOException(e);
+		}
+	}
+	
+	/**
+	 * calls {@link PacketComponentI#write(ByteBuf)} on the given {@link PacketComponentI},
+	 * writing its contents to this {@link ByteBuf}.
+	 * Flushes the underlying {@link OutputStream} afterwards.
+	 * @param packetComponent the {@link PacketComponentI} to write
+	 * @throws BufException if this operation fails
+	 */
+	@Override
+	public void write(PacketComponentI packetComponent) throws BufException {
+		super.write(packetComponent);
+		try {
+			outputStream.flush();
 		} catch (IOException e) {
 			throw new StreamBufIOException(e);
 		}

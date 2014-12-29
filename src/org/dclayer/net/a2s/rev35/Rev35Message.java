@@ -8,7 +8,9 @@ import org.dclayer.net.a2s.A2SMessage;
 import org.dclayer.net.a2s.A2SMessageReceiver;
 import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
 import org.dclayer.net.a2s.message.AddressPublicKeyMessageI;
-import org.dclayer.net.a2s.message.ApplicationChannelRequestMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelAcceptMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelIncomingRequestMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelOutgoingRequestMessageI;
 import org.dclayer.net.a2s.message.JoinDefaultNetworksMessageI;
 import org.dclayer.net.a2s.message.KeyCryptoResponseDataMessageI;
 import org.dclayer.net.a2s.message.KeyDecryptDataMessageI;
@@ -148,7 +150,19 @@ public class Rev35Message extends A2SMessage {
 	}
 
 	@Override
-	public ApplicationChannelRequestMessageI setApplicationChannelRequestMessage() {
+	public ApplicationChannelOutgoingRequestMessageI setApplicationChannelOutgoingRequestMessage() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public ApplicationChannelIncomingRequestMessageI setApplicationChannelIncomingRequestMessage() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public ApplicationChannelAcceptMessageI setApplicationChannelAcceptMessage() {
 		// TODO Auto-generated method stub
 		return null;
 	}

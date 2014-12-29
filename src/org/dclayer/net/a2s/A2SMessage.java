@@ -1,7 +1,9 @@
 package org.dclayer.net.a2s;
 
 import org.dclayer.net.a2s.message.AddressPublicKeyMessageI;
-import org.dclayer.net.a2s.message.ApplicationChannelRequestMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelAcceptMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelIncomingRequestMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelOutgoingRequestMessageI;
 import org.dclayer.net.a2s.message.DataMessageI;
 import org.dclayer.net.a2s.message.JoinDefaultNetworksMessageI;
 import org.dclayer.net.a2s.message.KeyCryptoResponseDataMessageI;
@@ -23,6 +25,8 @@ public abstract class A2SMessage extends A2SPacketComponent {
 	public abstract KeyEncryptDataMessageI setKeyEncryptDataMessage();
 	public abstract KeyDecryptDataMessageI setKeyDecryptDataMessage();
 	public abstract KeyCryptoResponseDataMessageI setKeyCryptoResponseDataMessage();
-	public abstract ApplicationChannelRequestMessageI setApplicationChannelRequestMessage();
+	public abstract ApplicationChannelOutgoingRequestMessageI setApplicationChannelOutgoingRequestMessage();
+	public abstract ApplicationChannelIncomingRequestMessageI setApplicationChannelIncomingRequestMessage();
+	public abstract ApplicationChannelAcceptMessageI setApplicationChannelAcceptMessage();
 	
 }

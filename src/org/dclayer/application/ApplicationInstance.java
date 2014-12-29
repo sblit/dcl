@@ -1,6 +1,9 @@
 package org.dclayer.application;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
 
@@ -17,13 +20,14 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.Data;
 import org.dclayer.net.a2s.A2SMessage;
 import org.dclayer.net.a2s.A2SMessageReceiver;
-import org.dclayer.net.a2s.message.ApplicationChannelRequestMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelOutgoingRequestMessageI;
 import org.dclayer.net.a2s.message.DataMessageI;
 import org.dclayer.net.a2s.rev0.Rev0Message;
 import org.dclayer.net.address.Address;
 import org.dclayer.net.buf.StreamByteBuf;
 import org.dclayer.net.component.AbsKeyComponent;
 import org.dclayer.net.componentinterface.AbsKeyComponentI;
+import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.network.NetworkType;
 
 public class ApplicationInstance extends Thread implements A2SMessageReceiver {
@@ -45,13 +49,13 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	
 	private Address<RSAKey> address;
 	
-	private OnReceiveListener defaultNetworksOnReceiveListener;
+	private NetworkEndpointSlotActionListener defaultNetworksOnReceiveListener;
 
 	public ApplicationInstance(
 			InetAddress inetAddress,
 			int port,
 			KeyPair<RSAKey> addressKeyPair,
-			OnReceiveListener defaultNetworksOnReceiveListener) throws ConnectionException {
+			NetworkEndpointSlotActionListener defaultNetworksOnReceiveListener) throws ConnectionException {
 		
 		this.address = new Address<>(addressKeyPair);
 		
@@ -60,7 +64,11 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 		try {
 			
 			Socket socket = new Socket(inetAddress, port);
-			this.streamByteBuf = new StreamByteBuf(socket.getInputStream(), socket.getOutputStream());
+			
+			InputStream inputStream = socket.getInputStream();
+			OutputStream outputStream = new BufferedOutputStream(socket.getOutputStream());
+			
+			this.streamByteBuf = new StreamByteBuf(inputStream, outputStream);
 			
 		} catch(IOException e) {
 			throw new ConnectionException(e);
@@ -157,7 +165,7 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	//
 	
 	private void sendMessage() throws BufException {
-		sendMessage.write(streamByteBuf);
+		streamByteBuf.write(sendMessage);
 	}
 	
 	private A2SMessage receiveMessage() throws ParseException, BufException {
@@ -195,10 +203,11 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 		send();
 	}
 	
-	private synchronized void sendApplicationChannelRequestMessage(int networkSlotId, int channelSlotId, Key remotePublicKey) {
-		ApplicationChannelRequestMessageI applicationChannelRequestMessage = sendMessage.setApplicationChannelRequestMessage();
+	private synchronized void sendApplicationChannelRequestMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, Key remotePublicKey) {
+		ApplicationChannelOutgoingRequestMessageI applicationChannelRequestMessage = sendMessage.setApplicationChannelOutgoingRequestMessage();
 		applicationChannelRequestMessage.setNetworkSlot(networkSlotId);
 		applicationChannelRequestMessage.setChannelSlot(channelSlotId);
+		applicationChannelRequestMessage.setActionIdentifierSuffix(actionIdentifierSuffix);
 		applicationChannelRequestMessage.getKeyComponent().setKey(remotePublicKey);
 		send();
 	}
@@ -209,8 +218,8 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 		sendDataMessage(networkEndpointSlot, destinationAddressData, data);
 	}
 	
-	public void requestApplicationChannel(NetworkEndpointSlot networkEndpointSlot, Key remotePublicKey) {
-		sendApplicationChannelRequestMessage(networkEndpointSlot.getSlot(), 0 /* TODO */, remotePublicKey);
+	public void requestApplicationChannel(NetworkEndpointSlot networkEndpointSlot, String actionIdentifier, Key remotePublicKey) {
+		sendApplicationChannelRequestMessage(networkEndpointSlot.getSlot(), 0 /* TODO */, actionIdentifier, remotePublicKey);
 		// TODO
 	}
 	
@@ -286,8 +295,20 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	}
 
 	@Override
-	public void onReceiveApplicationChannelRequestMessage(int networkSlotId, int channelSlotId, AbsKeyComponent keyComponent) {
+	public void onReceiveApplicationChannelIncomingRequestMessage(int networkSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA) {
 		// TODO illegal
+	}
+
+	@Override
+	public void onReceiveApplicationChannelOutgoingRequestMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void onReceiveApplicationChannelAcceptMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA) {
+		// TODO Auto-generated method stub
+		
 	}
 	
 	//

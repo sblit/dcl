@@ -7,14 +7,10 @@ import org.dclayer.net.PacketComponent;
 import org.dclayer.net.a2s.A2SMessage;
 import org.dclayer.net.a2s.A2SMessageReceiver;
 import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
-import org.dclayer.net.a2s.message.AddressPublicKeyMessageI;
-import org.dclayer.net.a2s.message.ApplicationChannelRequestMessageI;
-import org.dclayer.net.a2s.message.JoinDefaultNetworksMessageI;
-import org.dclayer.net.a2s.message.KeyCryptoResponseDataMessageI;
-import org.dclayer.net.a2s.message.KeyDecryptDataMessageI;
-import org.dclayer.net.a2s.message.KeyEncryptDataMessageI;
 import org.dclayer.net.a2s.rev0.message.AddressPublicKeyMessage;
-import org.dclayer.net.a2s.rev0.message.ApplicationChannelRequestMessage;
+import org.dclayer.net.a2s.rev0.message.ApplicationChannelAcceptMessage;
+import org.dclayer.net.a2s.rev0.message.ApplicationChannelIncomingRequestMessage;
+import org.dclayer.net.a2s.rev0.message.ApplicationChannelOutgoingRequestMessage;
 import org.dclayer.net.a2s.rev0.message.DataMessage;
 import org.dclayer.net.a2s.rev0.message.GenerateKeyMessage;
 import org.dclayer.net.a2s.rev0.message.JoinDefaultNetworksMessage;
@@ -41,7 +37,9 @@ public class Rev0Message extends A2SMessage {
 	public static final int KEY_ENCRYPT_DATA = 7;
 	public static final int KEY_DECRYPT_DATA = 8;
 	public static final int KEY_CRYPTO_RESPONSE_DATA = 9;
-	public static final int APPLICATION_CHANNEL_REQUEST = 10;
+	public static final int APPLICATION_CHANNEL_OUTGOING_REQUEST = 10;
+	public static final int APPLICATION_CHANNEL_INCOMING_REQUEST = 11;
+	public static final int APPLICATION_CHANNEL_ACCEPT = 12;
 
 	private A2SRevisionSpecificMessage message;
 	
@@ -56,7 +54,9 @@ public class Rev0Message extends A2SMessage {
 		new KeyEncryptDataMessage(),
 		new KeyDecryptDataMessage(),
 		new KeyCryptoResponseDataMessage(),
-		new ApplicationChannelRequestMessage()
+		new ApplicationChannelOutgoingRequestMessage(),
+		new ApplicationChannelIncomingRequestMessage(),
+		new ApplicationChannelAcceptMessage()
 	};
 
 	@Override
@@ -117,46 +117,59 @@ public class Rev0Message extends A2SMessage {
 		message.callOnReceiveMethod(a2sMessageReceiver);
 	}
 	
+	@Override
 	public RevisionMessage setRevisionMessage() {
 		return (RevisionMessage)(this.message = messages[REVISION]);
 	}
 	
+	@Override
 	public DataMessage setDataMessage() {
 		return (DataMessage)(this.message = messages[DATA]);
 	}
 	
+	@Override
 	public SlotAssignMessage setSlotAssignMessage() {
 		return (SlotAssignMessage)(this.message = messages[SLOT_ASSIGN]);
 	}
 
 	@Override
-	public AddressPublicKeyMessageI setAddressPublicKeyMessage() {
+	public AddressPublicKeyMessage setAddressPublicKeyMessage() {
 		return (AddressPublicKeyMessage)(this.message = messages[ADDRESS_PUBLIC_KEY]);
 	}
 
 	@Override
-	public JoinDefaultNetworksMessageI setJoinDefaultNetworksMessage() {
+	public JoinDefaultNetworksMessage setJoinDefaultNetworksMessage() {
 		return (JoinDefaultNetworksMessage)(this.message = messages[JOIN_DEFAULT_NETWORKS]);
 	}
 
 	@Override
-	public KeyEncryptDataMessageI setKeyEncryptDataMessage() {
+	public KeyEncryptDataMessage setKeyEncryptDataMessage() {
 		return (KeyEncryptDataMessage)(this.message = messages[KEY_ENCRYPT_DATA]);
 	}
 	
 	@Override
-	public KeyDecryptDataMessageI setKeyDecryptDataMessage() {
+	public KeyDecryptDataMessage setKeyDecryptDataMessage() {
 		return (KeyDecryptDataMessage)(this.message = messages[KEY_DECRYPT_DATA]);
 	}
 
 	@Override
-	public KeyCryptoResponseDataMessageI setKeyCryptoResponseDataMessage() {
+	public KeyCryptoResponseDataMessage setKeyCryptoResponseDataMessage() {
 		return (KeyCryptoResponseDataMessage)(this.message = messages[KEY_CRYPTO_RESPONSE_DATA]);
 	}
 
 	@Override
-	public ApplicationChannelRequestMessageI setApplicationChannelRequestMessage() {
-		return (ApplicationChannelRequestMessage)(this.message = messages[APPLICATION_CHANNEL_REQUEST]);
+	public ApplicationChannelOutgoingRequestMessage setApplicationChannelOutgoingRequestMessage() {
+		return (ApplicationChannelOutgoingRequestMessage)(this.message = messages[APPLICATION_CHANNEL_OUTGOING_REQUEST]);
+	}
+
+	@Override
+	public ApplicationChannelIncomingRequestMessage setApplicationChannelIncomingRequestMessage() {
+		return (ApplicationChannelIncomingRequestMessage)(this.message = messages[APPLICATION_CHANNEL_INCOMING_REQUEST]);
+	}
+
+	@Override
+	public ApplicationChannelAcceptMessage setApplicationChannelAcceptMessage() {
+		return (ApplicationChannelAcceptMessage)(this.message = messages[APPLICATION_CHANNEL_ACCEPT]);
 	}
 
 }

@@ -24,7 +24,7 @@ public class DCL {
 	
 	public static final NetworkType[] DEFAULT_NETWORK_TYPES = new NetworkType[] { new CircleNetworkType(HashAlgorithm.SHA1, 2) };
 	
-	public static final String ACTION_IDENTIFIER_APPLICATION_CHANNEL = "org.dclayer.applicationchannel";
+	public static final String ACTION_IDENTIFIER_APPLICATION_CHANNEL_PREFIX = "org.dclayer.applicationchannel/";
 
 	public static void main(String[] args) throws ParseException {
 		
