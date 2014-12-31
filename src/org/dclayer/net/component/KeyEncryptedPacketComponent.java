@@ -78,7 +78,7 @@ public abstract class KeyEncryptedPacketComponent extends PacketComponent {
 
 	@Override
 	public final int length() {
-		return keyComponent.length() + privateKey.getBlockNumBytes();
+		return keyComponent.length() + publicKey.getBlockNumBytes();
 	}
 
 	@Override

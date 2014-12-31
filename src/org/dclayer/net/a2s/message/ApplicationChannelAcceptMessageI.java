@@ -1,5 +1,6 @@
 package org.dclayer.net.a2s.message;
 
+import org.dclayer.net.componentinterface.DataComponentI;
 import org.dclayer.net.componentinterface.KeyComponentI;
 import org.dclayer.net.llacache.LLA;
 
@@ -19,5 +20,7 @@ public interface ApplicationChannelAcceptMessageI {
 	
 	public LLA getSenderLLA();
 	public void setSenderLLA(LLA senderLLA);
+	
+	public DataComponentI getIgnoreDataComponent();
 	
 }

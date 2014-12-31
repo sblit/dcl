@@ -7,6 +7,7 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 
 import org.dclayer.PreLinkCommunicationManager.Result;
 import org.dclayer.crypto.Crypto;
@@ -28,6 +29,7 @@ import org.dclayer.net.crisp.CrispPacket;
 import org.dclayer.net.crisp.message.NeighborRequestCrispMessageI;
 import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.interservice.InterserviceChannelActionListener;
+import org.dclayer.net.interservice.InterservicePolicy;
 import org.dclayer.net.link.Link;
 import org.dclayer.net.link.Link.Status;
 import org.dclayer.net.link.LinkSendInterface;
@@ -77,6 +79,8 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	private DataByteBuf networkPayloadDataByteBuf = new DataByteBuf();
 	private CrispPacket inCrispPacket = new CrispPacket();
 	
+	private LLA localLLA; // TODO remove
+	
 	public DCLService(int s2sPort, int a2sPort, LLADatabase llaDatabase) throws IOException {
 		
 		this.llaDatabase = llaDatabase;
@@ -115,7 +119,17 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	@Override
 	public LLA getLocalLLA() {
 		// TODO
-		return new InetSocketLLA(InetAddress.getLoopbackAddress(), 0);
+		return localLLA;
+	}
+	
+	// TODO remove
+	public void setLocalLLA(LLA localLLA) {
+		this.localLLA = localLLA;
+	}
+	
+	@Override
+	public Data getServiceIgnoreData() {
+		return preLinkCommunicationManager.getCurrentIgnoreData();
 	}
 	
 	public void join(NetworkType networkType) {
@@ -132,7 +146,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 			}
 
 			@Override
-			public void neighborRequest(Key senderPublicKey, String actionIdentifier, LLA senderLLA, boolean response) {
+			public void neighborRequest(Key senderPublicKey, String actionIdentifier, LLA senderLLA, boolean response, Data ignoreData) {
 				onNeighborRequest(this, senderPublicKey, actionIdentifier, senderLLA, response);
 			}
 		};
@@ -249,7 +263,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 			return;
 		}
 		
-		Log.debug(this, "crisp packet received: %s", inCrispPacket);
+		Log.debug(this, "crisp packet received: %s", inCrispPacket.represent(true));
 		
 		inCrispPacket.getCrispMessage().callOnReceiveMethod(this, networkInstance);
 		
@@ -264,9 +278,29 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 		String actionIdentifier = neighborRequestCrispMessage.getActionIdentifier();
 		LLA senderLLA = neighborRequestCrispMessage.getSenderLLA();
 		boolean response = neighborRequestCrispMessage.isResponse();
+		Data ignoreData = response ? null : neighborRequestCrispMessage.getIgnoreDataComponent().getData();
 		
-		networkInstance.neighborRequest(senderPublicKey, actionIdentifier, senderLLA, response);
+		networkInstance.neighborRequest(senderPublicKey, actionIdentifier, senderLLA, response, ignoreData);
 		
+	}
+	
+	//
+	
+	@Override
+	public synchronized void connect(LLA lla, InterservicePolicy interservicePolicy) {
+		CachedLLA cachedLLA = getLLACache().getCachedLLA(lla, true);
+		cachedLLA.setInterservicePolicy(interservicePolicy);
+		connectionInitiationManager.connect(cachedLLA);
+	}
+	
+	/**
+	 * sends a random packet to the given LLA in order to punch a hole in a local NAT
+	 */
+	@Override
+	public void prepareForIncomingConnection(LLA lla, InterservicePolicy interservicePolicy, Data ignoreData) {
+		CachedLLA cachedLLA = getLLACache().getCachedLLA(lla, true);
+		cachedLLA.setInterservicePolicy(interservicePolicy);
+		connectionInitiationManager.punch(cachedLLA, ignoreData);
 	}
 	
 	//
@@ -278,7 +312,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	}
 	
 	@Override
-	public void onReceiveS2S(InetSocketAddress inetSocketAddress, DataByteBuf dataByteBuf) {
+	public void onReceiveS2S(InetSocketAddress inetSocketAddress, DataByteBuf dataByteBuf, Data data) {
 		
 		InetAddress inetAddress = inetSocketAddress.getAddress();
 		int port = inetSocketAddress.getPort();
@@ -287,18 +321,24 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 		
 		CachedLLA cachedLLA = llaCache.getIPPortCachedLLA(inetAddress, port, false);
 		
-		if(cachedLLA == null) {
+		if(cachedLLA == null || cachedLLA.disconnected()) {
 			
 			// we're being connected to
 			
-			Result result = preLinkCommunicationManager.permit(inetAddress, port, dataByteBuf);
-			send(inetSocketAddress, result.echoData);
+			Result result = preLinkCommunicationManager.permit(inetAddress, port, data);
 			
-			if(result.done) {
-				cachedLLA = llaCache.getIPPortCachedLLA(inetAddress, port, true);
-				cachedLLA.setFirstLinkPacketPrefixData(result.firstLinkPacketPrefixData);
+			if(result != null) {
+			
+				send(inetSocketAddress, result.echoData);
+				
+				if(result.done) {
+					cachedLLA = llaCache.getIPPortCachedLLA(inetAddress, port, true);
+					cachedLLA.setStatus(CachedLLA.CONNECTING_PRELINK);
+					cachedLLA.setFirstLinkPacketPrefixData(result.firstLinkPacketPrefixData);
+				}
+				
 			}
-			
+				
 			return;
 			
 		}
@@ -307,9 +347,13 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 		if(link == null) {
 			
 			if(cachedLLA.getFirstLinkPacketPrefixData() == null) {
+				
+				if(cachedLLA.disconnected()) {
+					return;
+				}
 			
 				// we're connecting via pre-link communication
-				Result result = preLinkCommunicationManager.echo(dataByteBuf);
+				Result result = preLinkCommunicationManager.echo(data);
 				if(result.done) {
 					cachedLLA.setLink(link = new Link<CachedLLA>(this, this, cachedLLA));
 					cachedLLA.setStatus(CachedLLA.CONNECTING_LINK);
@@ -325,20 +369,21 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 				// we're being connected to and pre-link communication is already completed
 				
 				Data prefixData = cachedLLA.getFirstLinkPacketPrefixData();
-				if(prefixData.equals(0, dataByteBuf.getData(), 0, prefixData.length())) {
+				if(prefixData.equals(0, data, 0, prefixData.length())) {
 				
 					// the first link packet is prefixed with the expected data
 					// -> create the link and feed it the rest (the latter happens at the bottom of this method)
 					link = new Link<CachedLLA>(this, this, cachedLLA);
 					cachedLLA.setLink(link);
 					cachedLLA.setFirstLinkPacketPrefixData(null);
-					dataByteBuf.seek(prefixData.length());
+					cachedLLA.setStatus(CachedLLA.CONNECTING_LINK);
+					dataByteBuf.skip(prefixData.length());
 					
 				} else {
 					
 					// the remote most likely didn't get our last confirmation packet.
 					// -> repeat the pre-link communication
-					Result result = preLinkCommunicationManager.permit(inetAddress, port, dataByteBuf);
+					Result result = preLinkCommunicationManager.permit(inetAddress, port, data);
 					send(inetSocketAddress, result.echoData);
 					return;
 					
@@ -355,6 +400,10 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 
 	@Override
 	public void sendLinkPacket(CachedLLA cachedLLA, Data data) {
+		send(cachedLLA, data);
+	}
+	
+	public void send(CachedLLA cachedLLA, Data data) {
 		send(cachedLLA.getLLA().getSocketAddress(), data);
 	}
 	

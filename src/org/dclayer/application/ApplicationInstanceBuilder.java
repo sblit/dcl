@@ -10,7 +10,7 @@ public class ApplicationInstanceBuilder {
 	private Service service;
 	
 	private KeyPair addressKeyPair;
-	private NetworkEndpointSlotActionListener defaultNetworksOnReceiveListener = null;
+	private NetworkEndpointActionListener defaultNetworksOnReceiveListener = null;
 	
 	public ApplicationInstanceBuilder(Service service) {
 		this.service = service;
@@ -45,7 +45,7 @@ public class ApplicationInstanceBuilder {
 		return this;
 	}
 	
-	public ApplicationInstanceBuilder joinDefaultNetworks(NetworkEndpointSlotActionListener defaultNetworksOnReceiveListener) {
+	public ApplicationInstanceBuilder joinDefaultNetworks(NetworkEndpointActionListener defaultNetworksOnReceiveListener) {
 		this.defaultNetworksOnReceiveListener = defaultNetworksOnReceiveListener;
 		return this;
 	}

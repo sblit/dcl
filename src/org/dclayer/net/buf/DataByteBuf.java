@@ -134,6 +134,14 @@ public class DataByteBuf extends ByteBuf {
 	}
 	
 	/**
+	 * skips the given amount of bytes
+	 * @param numBytes the amount of bytes to skip
+	 */
+	public void skip(int numBytes) {
+		this.position += numBytes;
+	}
+	
+	/**
 	 * returns the current position inside this {@link DataByteBuf}'s underlying {@link Data}
 	 * @return the current position inside this {@link DataByteBuf}'s underlying {@link Data}
 	 */

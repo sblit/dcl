@@ -3,7 +3,6 @@ package org.dclayer.net;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.buf.ByteBuf;
-import org.dclayer.net.s2s.rev0.component.ServiceAddressComponent;
 
 /**
  * abstract class that parts of packets (e.g. {@link Rev0Message} and {@link ServiceAddressComponent}) extend.

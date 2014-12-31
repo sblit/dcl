@@ -1,5 +1,6 @@
 package org.dclayer.net.crisp.message;
 
+import org.dclayer.net.componentinterface.DataComponentI;
 import org.dclayer.net.componentinterface.KeyEncryptedPacketComponentI;
 import org.dclayer.net.llacache.LLA;
 
@@ -13,5 +14,7 @@ public interface NeighborRequestCrispMessageI extends KeyEncryptedPacketComponen
 	
 	public boolean isResponse();
 	public void setResponse(boolean response);
+	
+	public DataComponentI getIgnoreDataComponent();
 	
 }

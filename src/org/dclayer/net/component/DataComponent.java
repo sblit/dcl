@@ -113,7 +113,7 @@ public class DataComponent extends PacketComponent implements DataComponentI {
 	@Override
 	public String toString() {
 		verifyLength();
-		return String.format("DataComponent(len=%s)", (int) dataLength.getNum());
+		return String.format("DataComponent(len=%s): %s", (int) dataLength.getNum(), data);
 	}
 
 	@Override

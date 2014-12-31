@@ -8,8 +8,10 @@ import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
 import org.dclayer.net.a2s.message.ApplicationChannelIncomingRequestMessageI;
 import org.dclayer.net.a2s.rev0.Rev0Message;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.component.FlexNum;
 import org.dclayer.net.component.KeyComponent;
+import org.dclayer.net.componentinterface.DataComponentI;
 import org.dclayer.net.llacache.LLA;
 
 public class ApplicationChannelIncomingRequestMessage extends A2SRevisionSpecificMessage implements ApplicationChannelIncomingRequestMessageI {
@@ -18,6 +20,7 @@ public class ApplicationChannelIncomingRequestMessage extends A2SRevisionSpecifi
 	private String actionIdentifierSuffix;
 	private KeyComponent remotePublicKeyComponent = new KeyComponent();
 	private LLA senderLLA;
+	private DataComponent ignoreDataComponent = new DataComponent();
 	
 	@Override
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
@@ -25,6 +28,7 @@ public class ApplicationChannelIncomingRequestMessage extends A2SRevisionSpecifi
 		actionIdentifierSuffix = byteBuf.readString();
 		remotePublicKeyComponent.read(byteBuf);
 		senderLLA = LLA.fromByteBuf(byteBuf);
+		ignoreDataComponent.read(byteBuf);
 	}
 	
 	@Override
@@ -33,11 +37,12 @@ public class ApplicationChannelIncomingRequestMessage extends A2SRevisionSpecifi
 		byteBuf.writeString(actionIdentifierSuffix);
 		remotePublicKeyComponent.write(byteBuf);
 		senderLLA.write(byteBuf);
+		ignoreDataComponent.write(byteBuf);
 	}
 	
 	@Override
 	public int length() {
-		return networkSlotFlexNum.length() + actionIdentifierSuffix.length() + 1 + remotePublicKeyComponent.length() + senderLLA.length();
+		return networkSlotFlexNum.length() + actionIdentifierSuffix.length() + 1 + remotePublicKeyComponent.length() + senderLLA.length() + ignoreDataComponent.length();
 	}
 	
 	@Override
@@ -47,7 +52,7 @@ public class ApplicationChannelIncomingRequestMessage extends A2SRevisionSpecifi
 	
 	@Override
 	public PacketComponent[] getChildren() {
-		return new PacketComponent[] { remotePublicKeyComponent };
+		return new PacketComponent[] { remotePublicKeyComponent, ignoreDataComponent };
 	}
 	
 	@Override
@@ -62,7 +67,7 @@ public class ApplicationChannelIncomingRequestMessage extends A2SRevisionSpecifi
 
 	@Override
 	public void callOnReceiveMethod(A2SMessageReceiver a2sMessageReceiver) {
-		a2sMessageReceiver.onReceiveApplicationChannelIncomingRequestMessage((int) networkSlotFlexNum.getNum(), actionIdentifierSuffix, remotePublicKeyComponent.getKeyComponent(), senderLLA);
+		a2sMessageReceiver.onReceiveApplicationChannelIncomingRequestMessage((int) networkSlotFlexNum.getNum(), actionIdentifierSuffix, remotePublicKeyComponent.getKeyComponent(), senderLLA, ignoreDataComponent.getData());
 	}
 
 	@Override
@@ -98,6 +103,11 @@ public class ApplicationChannelIncomingRequestMessage extends A2SRevisionSpecifi
 	@Override
 	public void setSenderLLA(LLA senderLLA) {
 		this.senderLLA = senderLLA;
+	}
+	
+	@Override
+	public DataComponentI getIgnoreDataComponent() {
+		return ignoreDataComponent;
 	}
 	
 }

@@ -8,11 +8,14 @@ import org.bouncycastle.crypto.digests.SHA1Digest;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
-import org.dclayer.net.buf.DataByteBuf;
 
 public class PreLinkCommunicationManager implements HierarchicalLevel {
 	
 	public static final int RANDOM_DATA_LENGTH = 8;
+	public static final int IGNORE_DATA_LENGTH = 8;
+	
+	public static final long RANDOM_DATA_RENEW_INTERVAL = 60000000000L;
+	public static final long IGNORE_DATA_RENEW_INTERVAL = 60000000000L;
 	
 	public static class Result {
 		public boolean done = false;
@@ -36,6 +39,9 @@ public class PreLinkCommunicationManager implements HierarchicalLevel {
 	private Data randomData;
 	private long lastRandomDataRenew;
 	
+	private Data ignoreData;
+	private long lastIgnoreDataRenew;
+	
 	private Data echoData = new Data();
 	
 	private Result result = new Result();
@@ -45,14 +51,51 @@ public class PreLinkCommunicationManager implements HierarchicalLevel {
 	public PreLinkCommunicationManager(HierarchicalLevel parentHierarchicalLevel) {
 		this.parentHierarchicalLevel = parentHierarchicalLevel;
 	}
-
-	public Result permit(InetAddress inetAddress, int port, DataByteBuf dataByteBuf) {
+	
+	public Data getCurrentIgnoreData() {
 		
-		if(randomData == null || (System.nanoTime() - lastRandomDataRenew) > 60000000000L) {
-			lastRandomDataRenew = System.nanoTime();
+		long now = System.nanoTime();
+		long timePassed = (now - lastIgnoreDataRenew);
+		long timeLeft = (IGNORE_DATA_RENEW_INTERVAL - timePassed);
+		
+		if(ignoreData == null || timeLeft < 1000000000L) {
+			
+			ignoreData = new Data(IGNORE_DATA_LENGTH);
+			new Random().nextBytes(ignoreData.getData());
+			lastIgnoreDataRenew = now;
+			
+		} else if(timeLeft < (IGNORE_DATA_RENEW_INTERVAL/5)) {
+			
+			lastIgnoreDataRenew = now - 4*IGNORE_DATA_RENEW_INTERVAL/5;
+			
+		}
+		
+		return ignoreData;
+		
+	}
+
+	public Result permit(InetAddress inetAddress, int port, Data receivedData) {
+		
+		long now = System.nanoTime();
+		
+		if(randomData == null || (now - lastRandomDataRenew) > RANDOM_DATA_RENEW_INTERVAL) {
+			lastRandomDataRenew = now;
 			if(randomData == null) randomData = new Data(RANDOM_DATA_LENGTH);
 			new Random().nextBytes(randomData.getData());
 			Log.debug(this, "renewed random data: %s", randomData);
+		}
+		
+		if(ignoreData != null) {
+			
+			if((now - lastIgnoreDataRenew) > IGNORE_DATA_RENEW_INTERVAL) {
+				ignoreData = null;
+				Log.debug(this, "removed ignore data");
+			} else if(receivedData.equals(0, ignoreData, 0, ignoreData.length())) {
+				
+				Log.debug(this, "ignoring data that starts with ignoreData (%s): %s", ignoreData, receivedData);
+				return null;
+				
+			}
 		}
 		
 		byte[] address = inetAddress.getAddress();
@@ -66,11 +109,9 @@ public class PreLinkCommunicationManager implements HierarchicalLevel {
 		digest.update(hashData.getData(), hashData.offset(), hashData.length());
 		digest.doFinal(hashedData.getData(), 0);
 		
-		Data receivedData = dataByteBuf.getData();
-		
 		Log.debug(this, "hashData=%s hashedData=%s receivedData=%s", hashData, hashedData, receivedData);
 		
-		if(dataByteBuf.getData().length() >= digestSize && hashedData.equals(0, receivedData, 0, digestSize)) {
+		if(receivedData.length() >= digestSize && hashedData.equals(0, receivedData, 0, digestSize)) {
 			
 			receivedData.relativeReset(digestSize, receivedData.length() - digestSize);
 			Data firstLinkPacketPrefixData = new Data(RANDOM_DATA_LENGTH);
@@ -97,9 +138,7 @@ public class PreLinkCommunicationManager implements HierarchicalLevel {
 		
 	}
 	
-	public Result echo(DataByteBuf dataByteBuf) {
-		
-		Data remoteData = dataByteBuf.getData();
+	public Result echo(Data remoteData) {
 		
 		Log.debug(this, "received data from remote we're trying to connect to: %s", remoteData);
 		

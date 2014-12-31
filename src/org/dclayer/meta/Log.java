@@ -258,7 +258,7 @@ public class Log {
 	}
 	
 	public static void exception(HierarchicalLevel hierarchicalLevel, Exception e, String format, Object... args) {
-		log(Level.ERROR, hierarchicalLevel, format + ": %s", args, getStackTraceAsString(e));
+		log(Level.ERROR, hierarchicalLevel, format + ": " + getStackTraceAsString(e), args);
 	}
 	
 	public static void exception(HierarchicalLevel hierarchicalLevel, Exception e) {

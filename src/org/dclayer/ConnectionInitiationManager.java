@@ -46,13 +46,12 @@ public class ConnectionInitiationManager extends Thread implements CachedLLAStat
 	public void run() {
 		List<LLA> llas = dclService.getLLAs();
 		for(LLA lla : llas) {
-			connect(lla);
+			dclService.connect(lla, null);
 		}
 	}
 	
-	private void connect(LLA lla) {
+	public synchronized void connect(final CachedLLA cachedLLA) {
 		
-		final CachedLLA cachedLLA = dclService.getLLACache().getCachedLLA(lla, true);
 		cachedLLA.setCachedLLAStatusListener(this);
 		
 		if(!cachedLLA.changeStatus(CachedLLA.DISCONNECTED, CachedLLA.CONNECTING_PRELINK)) {
@@ -75,7 +74,7 @@ public class ConnectionInitiationManager extends Thread implements CachedLLAStat
 				
 				while((disconnected = (cachedLLA.getStatus() == CachedLLA.CONNECTING_PRELINK)) && n < MAX_NUM_CONNECTION_INIT_MSGS) {
 					
-					dclService.sendLinkPacket(cachedLLA, data);
+					punch(cachedLLA, data);
 					
 					try {
 						Thread.sleep(delay);
@@ -97,6 +96,16 @@ public class ConnectionInitiationManager extends Thread implements CachedLLAStat
 			}
 		}).start();
 		
+	}
+	
+	public synchronized void punch(CachedLLA cachedLLA) {
+		final Data data = new Data((int)(Math.random() * 8) + 8);
+		new Random().nextBytes(data.getData());
+		punch(cachedLLA, data);
+	}
+	
+	public synchronized void punch(CachedLLA cachedLLA, Data data) {
+		dclService.send(cachedLLA, data);
 	}
 
 	@Override

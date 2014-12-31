@@ -39,10 +39,15 @@ public class UDPSocket extends Thread implements HierarchicalLevel {
 	
 	@Override
 	public void run() {
-		DataByteBuf dataByteBuf = new DataByteBuf(0xFFFF);
-		byte[] buf = dataByteBuf.getData().getData();
+		
+		Data data = new Data(0xFFFF);
+		DataByteBuf dataByteBuf = new DataByteBuf(data);
+		byte[] buf = data.getData();
+		
 		DatagramPacket p;
+		
 		for(;;) {
+			
 			p = new DatagramPacket(buf, buf.length);
 			
 			try {
@@ -64,7 +69,8 @@ public class UDPSocket extends Thread implements HierarchicalLevel {
 				return;
 			}
 			
-			this.onReceiveListener.onReceiveS2S(inetSocketAddress, dataByteBuf);
+			this.onReceiveListener.onReceiveS2S(inetSocketAddress, dataByteBuf, data);
+			
 		}
 	}
 	

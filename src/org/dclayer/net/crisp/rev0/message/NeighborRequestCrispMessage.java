@@ -4,7 +4,9 @@ import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.component.KeyEncryptedPacketComponent;
+import org.dclayer.net.componentinterface.DataComponentI;
 import org.dclayer.net.crisp.CrispMessage;
 import org.dclayer.net.crisp.CrispMessageReceiver;
 import org.dclayer.net.crisp.CrispPacket;
@@ -15,8 +17,8 @@ public class NeighborRequestCrispMessage extends KeyEncryptedPacketComponent imp
 	
 	private String actionIdentifier;
 	private LLA senderLLA = null;
-	
 	private boolean response = false;
+	private DataComponent ignoreDataComponent = new DataComponent();
 	
 	@Override
 	public void readPlain(ByteBuf byteBuf) throws ParseException, BufException {
@@ -24,6 +26,7 @@ public class NeighborRequestCrispMessage extends KeyEncryptedPacketComponent imp
 		actionIdentifier = byteBuf.readString();
 		senderLLA = LLA.fromByteBuf(byteBuf);
 		response = byteBuf.read() != 0;
+		if(!response) ignoreDataComponent.read(byteBuf);
 		
 	}
 
@@ -33,17 +36,18 @@ public class NeighborRequestCrispMessage extends KeyEncryptedPacketComponent imp
 		byteBuf.writeString(actionIdentifier);
 		senderLLA.write(byteBuf);
 		byteBuf.write((byte)(response ? 0xFF : 0));
+		if(!response) ignoreDataComponent.write(byteBuf);
 		
 	}
 
 	@Override
 	public int plainLength() {
-		return actionIdentifier.length() + 1 + senderLLA.length() + 1;
+		return actionIdentifier.length() + 1 + senderLLA.length() + 1 + (response ? 0 : ignoreDataComponent.length());
 	}
 
 	@Override
 	public PacketComponent[] getPlainChildren() {
-		return null;
+		return response ? null : new PacketComponent[] { ignoreDataComponent };
 	}
 
 	@Override
@@ -89,6 +93,11 @@ public class NeighborRequestCrispMessage extends KeyEncryptedPacketComponent imp
 	@Override
 	public <T> void callOnReceiveMethod(CrispMessageReceiver<T> crispMessageReceiver, T o) {
 		crispMessageReceiver.onReceiveNeighborRequestCrispMessage(this, o);
+	}
+
+	@Override
+	public DataComponentI getIgnoreDataComponent() {
+		return ignoreDataComponent;
 	}
 
 }

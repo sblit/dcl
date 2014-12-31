@@ -6,7 +6,7 @@ import org.dclayer.crypto.key.Key;
 import org.dclayer.net.Data;
 import org.dclayer.net.llacache.LLA;
 
-public interface NetworkEndpointSlotActionListener {
+public interface NetworkEndpointActionListener {
 
 	public void onJoin(NetworkEndpointSlot networkEndpointSlot, Data ownAddressData);
 	public void onReceive(NetworkEndpointSlot networkEndpointSlot, Data data, Data sourceAddressData);

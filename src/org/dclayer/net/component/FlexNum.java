@@ -40,7 +40,7 @@ public class FlexNum extends PacketComponent implements NumComponentI {
 	 * creates a new, empty {@link FlexNum}
 	 */
 	public FlexNum() {
-		
+		this(0);
 	}
 	
 	/**

@@ -7,12 +7,16 @@ import java.net.UnknownHostException;
 import java.util.LinkedList;
 
 import org.dclayer.crypto.hash.HashAlgorithm;
+import org.dclayer.crypto.key.Key;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.apbr.APBRNetworkType;
 import org.dclayer.net.circle.CircleNetworkType;
+import org.dclayer.net.interservice.InterservicePolicy;
 import org.dclayer.net.llacache.InetSocketLLA;
+import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.lladatabase.LLADatabase;
+import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkType;
 
 public class DCL {
@@ -25,10 +29,15 @@ public class DCL {
 	public static final NetworkType[] DEFAULT_NETWORK_TYPES = new NetworkType[] { new CircleNetworkType(HashAlgorithm.SHA1, 2) };
 	
 	public static final String ACTION_IDENTIFIER_APPLICATION_CHANNEL_PREFIX = "org.dclayer.applicationchannel/";
+	
+	public static InterservicePolicy defaultApplicationChannelInterservicePolicy(NetworkInstance networkInstance, String actionIdentifier, LLA remoteLLA, Key remotePublicKey) {
+		return new InterservicePolicy(); // TODO restrict
+	}
 
 	public static void main(String[] args) throws ParseException {
 		
 		final LLADatabase llaDatabase = new LLADatabase();
+		LLA localLLA = null;
 		
 		int s2sPort = 1337;
 		int a2sPort = 2000;
@@ -60,6 +69,19 @@ public class DCL {
 				}
 				break;
 			}
+			case "local": {
+				String[] localParts = argParts[1].split(":");
+				String localHost = localParts[0];
+				int localPort = Integer.parseInt(localParts[1]);
+				System.out.println(String.format("local: host=%s port=%s", localHost, localPort));
+				try {
+					localLLA = new InetSocketLLA((Inet4Address) InetAddress.getByName(localHost), localPort);
+				} catch (UnknownHostException e) {
+					e.printStackTrace();
+					return;
+				}
+				break;
+			}
 			case "apbrnet": {
 				APBRNetworkType apbrNetworkType = new APBRNetworkType(argParts[1]);
 				System.out.println(String.format("will join network %s", apbrNetworkType));
@@ -83,6 +105,10 @@ public class DCL {
 		} catch (IOException e) {
 			Log.fatal(Log.PART_MAIN, e);
 			return;
+		}
+		
+		if(localLLA != null) {
+			service.setLocalLLA(localLLA);
 		}
 		
 		for(NetworkType networkType : networkTypes) {

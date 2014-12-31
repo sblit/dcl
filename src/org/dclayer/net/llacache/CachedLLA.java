@@ -3,6 +3,7 @@ package org.dclayer.net.llacache;
 import org.dclayer.listener.net.CachedLLAStatusListener;
 import org.dclayer.net.Data;
 import org.dclayer.net.interservice.InterserviceChannel;
+import org.dclayer.net.interservice.InterservicePolicy;
 import org.dclayer.net.link.Link;
 
 /**
@@ -36,6 +37,8 @@ public class CachedLLA {
 	private Link link;
 	
 	private InterserviceChannel interserviceChannel;
+	
+	private InterservicePolicy interservicePolicy;
 	
 	/**
 	 * the {@link Data} that the first link packet received from this remote is expected to be prefixed with
@@ -72,6 +75,10 @@ public class CachedLLA {
 		return true;
 	}
 	
+	public boolean disconnected() {
+		return this.status == DISCONNECTED;
+	}
+	
 	public LLA getLLA() {
 		return lla;
 	}
@@ -90,6 +97,14 @@ public class CachedLLA {
 	
 	public InterserviceChannel getInterserviceChannel() {
 		return interserviceChannel;
+	}
+	
+	public void setInterservicePolicy(InterservicePolicy interservicePolicy) {
+		this.interservicePolicy = interservicePolicy;
+	}
+	
+	public InterservicePolicy getInterservicePolicy() {
+		return interservicePolicy;
 	}
 	
 	public void setFirstLinkPacketPrefixData(Data firstLinkPacketPrefixData) {

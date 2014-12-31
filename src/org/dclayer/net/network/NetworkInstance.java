@@ -55,6 +55,6 @@ public abstract class NetworkInstance extends NetworkNode<Object> implements Hie
 		return parentHierarchicalLevel;
 	}
 	
-	public abstract void neighborRequest(Key senderPublicKey, String actionIdentifier, LLA senderLLA, boolean response);
+	public abstract void neighborRequest(Key senderPublicKey, String actionIdentifier, LLA senderLLA, boolean response, Data ignoreData);
 	
 }

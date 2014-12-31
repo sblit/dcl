@@ -6,7 +6,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
 
+import org.dclayer.application.applicationchannel.ApplicationChannelActionListener;
+import org.dclayer.application.applicationchannel.DCLApplicationChannel;
+import org.dclayer.application.applicationchannelslotmap.ApplicationChannelSlot;
+import org.dclayer.application.applicationchannelslotmap.ApplicationChannelSlotMap;
 import org.dclayer.application.exception.ConnectionException;
 import org.dclayer.application.exception.RevisionNegotiationConnectionException;
 import org.dclayer.application.networktypeslotmap.NetworkEndpointSlot;
@@ -14,12 +20,14 @@ import org.dclayer.application.networktypeslotmap.NetworkEndpointSlotMap;
 import org.dclayer.crypto.key.Key;
 import org.dclayer.crypto.key.KeyPair;
 import org.dclayer.crypto.key.RSAKey;
+import org.dclayer.exception.crypto.CryptoException;
 import org.dclayer.exception.crypto.InvalidCipherCryptoException;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.Data;
 import org.dclayer.net.a2s.A2SMessage;
 import org.dclayer.net.a2s.A2SMessageReceiver;
+import org.dclayer.net.a2s.message.ApplicationChannelAcceptMessageI;
 import org.dclayer.net.a2s.message.ApplicationChannelOutgoingRequestMessageI;
 import org.dclayer.net.a2s.message.DataMessageI;
 import org.dclayer.net.a2s.rev0.Rev0Message;
@@ -49,17 +57,20 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	
 	private Address<RSAKey> address;
 	
-	private NetworkEndpointSlotActionListener defaultNetworksOnReceiveListener;
-
+	private NetworkEndpointActionListener defaultNetworkEndpointActionListener;
+	private Map<NetworkType, NetworkEndpointActionListener> networkTypeListeners = new HashMap<>();
+	
+	private ApplicationChannelSlotMap applicationChannelSlotMap = new ApplicationChannelSlotMap();
+	
 	public ApplicationInstance(
 			InetAddress inetAddress,
 			int port,
 			KeyPair<RSAKey> addressKeyPair,
-			NetworkEndpointSlotActionListener defaultNetworksOnReceiveListener) throws ConnectionException {
+			NetworkEndpointActionListener defaultNetworkEndpointsActionListener) throws ConnectionException {
 		
 		this.address = new Address<>(addressKeyPair);
 		
-		this.defaultNetworksOnReceiveListener = defaultNetworksOnReceiveListener;
+		this.defaultNetworkEndpointActionListener = defaultNetworkEndpointsActionListener;
 		
 		try {
 			
@@ -117,7 +128,7 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 		if(addressKeyPair != null) {
 			sendAddressPublicKeyMessage(addressKeyPair.getPublicKey());
 			
-			if(defaultNetworksOnReceiveListener != null) {
+			if(defaultNetworkEndpointsActionListener != null) {
 				sendJoinDefaultNetworksMessage();
 			}
 		}
@@ -212,6 +223,17 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 		send();
 	}
 	
+	private synchronized void sendApplicationChannelAcceptMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, Key remotePublicKey, LLA senderLLA, Data ignoreData) {
+		ApplicationChannelAcceptMessageI applicationChannelAcceptMessage = sendMessage.setApplicationChannelAcceptMessage();
+		applicationChannelAcceptMessage.setNetworkSlot(networkSlotId);
+		applicationChannelAcceptMessage.setChannelSlot(channelSlotId);
+		applicationChannelAcceptMessage.setActionIdentifierSuffix(actionIdentifierSuffix);
+		applicationChannelAcceptMessage.getKeyComponent().setKey(remotePublicKey);
+		applicationChannelAcceptMessage.setSenderLLA(senderLLA);
+		applicationChannelAcceptMessage.getIgnoreDataComponent().setData(ignoreData);
+		send();
+	}
+	
 	//
 	
 	public void send(NetworkEndpointSlot networkEndpointSlot, Data destinationAddressData, Data data) {
@@ -219,23 +241,29 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	}
 	
 	public void requestApplicationChannel(NetworkEndpointSlot networkEndpointSlot, String actionIdentifier, Key remotePublicKey) {
-		sendApplicationChannelRequestMessage(networkEndpointSlot.getSlot(), 0 /* TODO */, actionIdentifier, remotePublicKey);
-		// TODO
+		
+		ApplicationChannelSlot applicationChannelSlot = applicationChannelSlotMap.find(remotePublicKey);
+		if(applicationChannelSlot == null) {
+			applicationChannelSlot = applicationChannelSlotMap.add(new DCLApplicationChannel(remotePublicKey, actionIdentifier, networkEndpointSlot));
+		}
+		
+		sendApplicationChannelRequestMessage(networkEndpointSlot.getSlot(), applicationChannelSlot.getSlot(), actionIdentifier, remotePublicKey);
+		
 	}
 	
 	//
 
 	@Override
-	public void onReceiveRevisionMessage(int revision) {
+	public synchronized void onReceiveRevisionMessage(int revision) {
 		this.receivedRevision = true;
 		this.revision = revision;
 	}
 
 	@Override
-	public void onReceiveDataMessage(int slot, Data addressData, Data data) {
+	public synchronized void onReceiveDataMessage(int slot, Data addressData, Data data) {
 		NetworkEndpointSlot networkEndpointSlot = networkEndpointSlotMap.get(slot);
 		NetworkEndpoint networkEndpoint = networkEndpointSlot.getNetworkEndpoint();
-		networkEndpoint.getOnReceiveListener().onReceive(networkEndpointSlot, data, addressData);
+		networkEndpoint.getNetworkEndpointActionListener().onReceive(networkEndpointSlot, data, addressData);
 	}
 
 	@Override
@@ -249,10 +277,22 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	}
 
 	@Override
-	public void onReceiveSlotAssignMessage(int slot, NetworkType networkType, Data addressData) {
-		NetworkEndpoint networkEndpoint = new NetworkEndpoint(networkType, defaultNetworksOnReceiveListener);
+	public synchronized void onReceiveSlotAssignMessage(int slot, NetworkType networkType, Data addressData) {
+		
+		NetworkEndpointActionListener networkEndpointActionListener = networkTypeListeners.get(networkType);
+		
+		if(networkEndpointActionListener == null) {
+			if(defaultNetworkEndpointActionListener != null) {
+				networkEndpointActionListener = defaultNetworkEndpointActionListener;
+			} else {
+				return;
+			}
+		}
+		
+		NetworkEndpoint networkEndpoint = new NetworkEndpoint(networkType, networkEndpointActionListener);
 		NetworkEndpointSlot networkEndpointSlot = networkEndpointSlotMap.put(slot, networkEndpoint);
-		networkEndpoint.getOnReceiveListener().onJoin(networkEndpointSlot, addressData);
+		networkEndpoint.getNetworkEndpointActionListener().onJoin(networkEndpointSlot, addressData);
+		
 	}
 
 	@Override
@@ -266,7 +306,7 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	}
 
 	@Override
-	public void onReceiveKeyEncryptDataMessage(Data plainData) {
+	public synchronized void onReceiveKeyEncryptDataMessage(Data plainData) {
 		Data cipherData;
 		try {
 			cipherData = this.address.getKeyPair().getPrivateKey().encrypt(plainData);
@@ -278,7 +318,7 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	}
 
 	@Override
-	public void onReceiveKeyDecryptDataMessage(Data cipherData) {
+	public synchronized void onReceiveKeyDecryptDataMessage(Data cipherData) {
 		Data plainData;
 		try {
 			plainData = this.address.getKeyPair().getPrivateKey().decrypt(cipherData);
@@ -295,20 +335,41 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	}
 
 	@Override
-	public void onReceiveApplicationChannelIncomingRequestMessage(int networkSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA) {
+	public synchronized void onReceiveApplicationChannelIncomingRequestMessage(int networkSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA, Data ignoreData) {
+		
+		Key remotePublicKey;
+		try {
+			remotePublicKey = keyComponent.getKey();
+		} catch (CryptoException e) {
+			e.printStackTrace();
+			return;
+		}
+		
+		NetworkEndpointSlot networkEndpointSlot = networkEndpointSlotMap.get(networkSlotId);
+		
+		if(networkEndpointSlot == null) return;
+		
+		NetworkEndpointActionListener networkEndpointActionListener = networkEndpointSlot.getNetworkEndpoint().getNetworkEndpointActionListener();
+		
+		ApplicationChannelActionListener applicationChannelActionListener = networkEndpointActionListener.onApplicationChannelRequest(networkEndpointSlot, remotePublicKey, actionIdentifierSuffix, senderLLA);
+		
+		if(applicationChannelActionListener != null) {
+			
+			ApplicationChannelSlot applicationChannelSlot = applicationChannelSlotMap.add(new DCLApplicationChannel(remotePublicKey, actionIdentifierSuffix, networkEndpointSlot));
+			sendApplicationChannelAcceptMessage(networkSlotId, applicationChannelSlot.getSlot(), actionIdentifierSuffix, remotePublicKey, senderLLA, ignoreData);
+			
+		}
+		
+	}
+
+	@Override
+	public synchronized void onReceiveApplicationChannelOutgoingRequestMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent) {
 		// TODO illegal
 	}
 
 	@Override
-	public void onReceiveApplicationChannelOutgoingRequestMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent) {
-		// TODO Auto-generated method stub
-		
-	}
-
-	@Override
-	public void onReceiveApplicationChannelAcceptMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA) {
-		// TODO Auto-generated method stub
-		
+	public synchronized void onReceiveApplicationChannelAcceptMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA, Data ignoreData) {
+		// TODO illegal
 	}
 	
 	//
