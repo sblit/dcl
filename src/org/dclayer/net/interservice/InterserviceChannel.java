@@ -21,6 +21,7 @@ import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.interservice.InterservicePolicy.ApplicationChannelEndpoints;
 import org.dclayer.net.interservice.applicationchannelslot.ApplicationChannelSlot;
 import org.dclayer.net.interservice.applicationchannelslot.ApplicationChannelSlotMap;
+import org.dclayer.net.interservice.message.ApplicationChannelDataInterserviceMessage;
 import org.dclayer.net.interservice.message.ApplicationChannelSlotAssignInterserviceMessage;
 import org.dclayer.net.interservice.message.ConnectionbaseNoticeInterserviceMessage;
 import org.dclayer.net.interservice.message.CryptoChallengeReplyInterserviceMessage;
@@ -495,6 +496,13 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		sendOutInterservicePacket();
 	}
 	
+	private synchronized void sendApplicationChannelDataInterserviceMessage(ApplicationChannelSlot applicationChannelSlot, Data data) {
+		ApplicationChannelDataInterserviceMessage applicationChannelDataInterserviceMessage = outInterservicePacket.setApplicationChannelDataInterserviceMessage();
+		applicationChannelDataInterserviceMessage.setApplicationChannelSlot(applicationChannelSlot.getSlot());
+		applicationChannelDataInterserviceMessage.getDataComponent().setData(data);
+		sendOutInterservicePacket();
+	}
+	
 	//
 	
 	private void onNetworkJoinNotice(AddressSlot remoteAddressSlot, final int networkSlotId, NetworkType networkType) {
@@ -903,6 +911,24 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		
 	}
 	
+	public synchronized void onReceiveApplicationChannelDataInterserviceMessage(ApplicationChannelDataInterserviceMessage applicationChannelDataInterserviceMessage) {
+		
+		int applicationChannelSlotId = applicationChannelDataInterserviceMessage.getApplicationChannelSlot();
+		ApplicationChannelSlot applicationChannelSlot = localApplicationChannelSlotMap.get(applicationChannelSlotId);
+		
+		if(applicationChannelSlot == null) {
+			Log.msg(this, "ignoring application channel data message for empty local application channel slot id %d", applicationChannelSlotId);
+			return;
+		}
+		
+		Data data = applicationChannelDataInterserviceMessage.getDataComponent().getData();
+		Log.msg(this, "forwarding data from application channel slot %s to application connection: %s", applicationChannelSlot, data);
+		
+		ApplicationChannel applicationChannel = applicationChannelSlot.getApplicationChannel();
+		applicationChannel.getApplicationSideApplicationChannelActionListener().onData(applicationChannel, data);
+		
+	}
+	
 	//
 
 	@Override
@@ -914,7 +940,12 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 	//
 
 	@Override
-	public void onData(ApplicationChannel applicationChannel, Data data) {
+	public synchronized void onData(ApplicationChannel applicationChannel, Data data) {
+		
+		ApplicationChannelSlot applicationChannelSlot = applicationChannel.getInterserviceChannelApplicationChannelSlot();
+		
+		Log.msg(this, "sending data on application channel slot %s: %s", applicationChannelSlot, data);
+		sendApplicationChannelDataInterserviceMessage(applicationChannelSlot, data);
 		
 	}
 	

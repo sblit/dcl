@@ -12,12 +12,13 @@ import java.util.Map;
 import org.dclayer.application.applicationchannel.AbsApplicationChannel;
 import org.dclayer.application.applicationchannel.ApplicationChannelActionListener;
 import org.dclayer.application.applicationchannel.DCLApplicationChannel;
-import org.dclayer.application.applicationchannelslotmap.ApplicationChannelSlot;
-import org.dclayer.application.applicationchannelslotmap.ApplicationChannelSlotMap;
+import org.dclayer.application.applicationchannel.slot.ApplicationChannelSlot;
+import org.dclayer.application.applicationchannel.slot.ApplicationChannelSlotMap;
 import org.dclayer.application.exception.ConnectionException;
 import org.dclayer.application.exception.RevisionNegotiationConnectionException;
 import org.dclayer.application.networktypeslotmap.NetworkEndpointSlot;
 import org.dclayer.application.networktypeslotmap.NetworkEndpointSlotMap;
+import org.dclayer.callback.VoidCallback;
 import org.dclayer.crypto.key.Key;
 import org.dclayer.crypto.key.KeyPair;
 import org.dclayer.crypto.key.RSAKey;
@@ -29,6 +30,7 @@ import org.dclayer.net.Data;
 import org.dclayer.net.a2s.A2SMessage;
 import org.dclayer.net.a2s.A2SMessageReceiver;
 import org.dclayer.net.a2s.message.ApplicationChannelAcceptMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelDataMessageI;
 import org.dclayer.net.a2s.message.ApplicationChannelOutgoingRequestMessageI;
 import org.dclayer.net.a2s.message.DataMessageI;
 import org.dclayer.net.a2s.rev0.Rev0Message;
@@ -236,6 +238,13 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 		send();
 	}
 	
+	private synchronized void sendApplicationChannelDataMessage(int channelSlotId, Data data) {
+		ApplicationChannelDataMessageI applicationChannelDataMessage = sendMessage.setApplicationChannelDataMessage();
+		applicationChannelDataMessage.setChannelSlot(channelSlotId);
+		applicationChannelDataMessage.getDataComponent().setData(data);
+		send();
+	}
+	
 	//
 	
 	public void send(NetworkEndpointSlot networkEndpointSlot, Data destinationAddressData, Data data) {
@@ -386,8 +395,25 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	public synchronized void onReceiveApplicationChannelConnectMessage(int channelSlotId) {
 		
 		ApplicationChannelSlot applicationChannelSlot = applicationChannelSlotMap.get(channelSlotId);
-		AbsApplicationChannel applicationChannel = applicationChannelSlot.getApplicationChannel();
+		final AbsApplicationChannel applicationChannel = applicationChannelSlot.getApplicationChannel();
+		
+		applicationChannel.makePipes(new VoidCallback<Data>() {
+			@Override
+			public void callback(Data data) {
+				sendApplicationChannelDataMessage(applicationChannel.getApplicationChannelSlot().getSlot(), data);
+			}
+		});
+		
 		applicationChannel.getApplicationChannelActionListener().onApplicationChannelConnected(applicationChannel);
+		
+	}
+	
+	@Override
+	public synchronized void onReceiveApplicationChannelDataMessage(int channelSlotId, Data data) {
+		
+		ApplicationChannelSlot applicationChannelSlot = applicationChannelSlotMap.get(channelSlotId);
+		AbsApplicationChannel applicationChannel = applicationChannelSlot.getApplicationChannel();
+		applicationChannel.pushData(data);
 		
 	}
 	

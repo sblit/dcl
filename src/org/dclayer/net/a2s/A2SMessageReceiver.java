@@ -22,5 +22,6 @@ public interface A2SMessageReceiver {
 	public void onReceiveApplicationChannelIncomingRequestMessage(int networkSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA, Data ignoreData);
 	public void onReceiveApplicationChannelAcceptMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA, Data ignoreData);
 	public void onReceiveApplicationChannelConnectMessage(int channelSlotId);
+	public void onReceiveApplicationChannelDataMessage(int channelSlotId, Data data);
 	
 }

@@ -49,11 +49,11 @@ public class ApplicationChannelSlotAssignInterserviceMessage extends Interservic
 	}
 	
 	public int getApplicationChannelSlot() {
-		return (int) senderAddressSlotFlexNum.getNum();
+		return (int) applicationChannelSlotFlexNum.getNum();
 	}
 	
 	public void setApplicationChannelSlot(int slot) {
-		senderAddressSlotFlexNum.setNum(slot);
+		applicationChannelSlotFlexNum.setNum(slot);
 	}
 	
 	public int getSenderAddressSlot() {
@@ -65,11 +65,11 @@ public class ApplicationChannelSlotAssignInterserviceMessage extends Interservic
 	}
 	
 	public int getReceiverAddressSlot() {
-		return (int) senderAddressSlotFlexNum.getNum();
+		return (int) receiverAddressSlotFlexNum.getNum();
 	}
 	
 	public void setReceiverAddressSlot(int slot) {
-		senderAddressSlotFlexNum.setNum(slot);
+		receiverAddressSlotFlexNum.setNum(slot);
 	}
 	
 	public String getActionIdentifier() {

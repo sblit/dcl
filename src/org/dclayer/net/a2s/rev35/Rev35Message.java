@@ -10,6 +10,7 @@ import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
 import org.dclayer.net.a2s.message.AddressPublicKeyMessageI;
 import org.dclayer.net.a2s.message.ApplicationChannelAcceptMessageI;
 import org.dclayer.net.a2s.message.ApplicationChannelConnectedMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelDataMessageI;
 import org.dclayer.net.a2s.message.ApplicationChannelIncomingRequestMessageI;
 import org.dclayer.net.a2s.message.ApplicationChannelOutgoingRequestMessageI;
 import org.dclayer.net.a2s.message.JoinDefaultNetworksMessageI;
@@ -170,6 +171,12 @@ public class Rev35Message extends A2SMessage {
 
 	@Override
 	public ApplicationChannelConnectedMessageI setApplicationChannelConnectedMessage() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public ApplicationChannelDataMessageI setApplicationChannelDataMessage() {
 		// TODO Auto-generated method stub
 		return null;
 	}

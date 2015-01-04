@@ -24,6 +24,7 @@ import org.dclayer.net.Data;
 import org.dclayer.net.a2s.applicationchannelslot.ApplicationChannelSlot;
 import org.dclayer.net.a2s.applicationchannelslot.ApplicationChannelSlotMap;
 import org.dclayer.net.a2s.message.ApplicationChannelConnectedMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelDataMessageI;
 import org.dclayer.net.a2s.message.ApplicationChannelIncomingRequestMessageI;
 import org.dclayer.net.a2s.message.DataMessageI;
 import org.dclayer.net.a2s.message.RevisionMessageI;
@@ -500,7 +501,14 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	
 	private synchronized void sendApplicationChannelConnectedMessage(int applicationChannelSlotId) {
 		ApplicationChannelConnectedMessageI applicationChannelConnectedMessage = sendMessage.setApplicationChannelConnectedMessage();
-		applicationChannelConnectedMessage.setApplicationChannelSlot(applicationChannelSlotId);
+		applicationChannelConnectedMessage.setChannelSlot(applicationChannelSlotId);
+		send();
+	}
+	
+	private synchronized void sendApplicationChannelDataMessage(int channelSlotId, Data data) {
+		ApplicationChannelDataMessageI applicationChannelDataMessage = sendMessage.setApplicationChannelDataMessage();
+		applicationChannelDataMessage.setChannelSlot(channelSlotId);
+		applicationChannelDataMessage.getDataComponent().setData(data);
 		send();
 	}
 	
@@ -683,6 +691,17 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	public void onReceiveApplicationChannelConnectMessage(int channelSlotId) {
 		// TODO illegal
 	}
+
+	@Override
+	public void onReceiveApplicationChannelDataMessage(int channelSlotId, Data data) {
+		
+		Log.debug(this, "received application channel data message for channel slot %d, data: %s", channelSlotId, data);
+		
+		ApplicationChannelSlot applicationChannelSlot = applicationChannelSlotMap.get(channelSlotId);
+		ApplicationChannel applicationChannel = applicationChannelSlot.getApplicationChannel();
+		applicationChannel.getServiceSideApplicationChannelActionListener().onData(applicationChannel, data);
+		
+	}
 	
 	//
 
@@ -701,7 +720,7 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	@Override
 	public void onData(ApplicationChannel applicationChannel, Data data) {
 		Log.debug(this, "notifying application of data from application channel %s: %s", applicationChannel, data);
-		// TODO
+		sendApplicationChannelDataMessage(applicationChannel.getApplicationConnectionApplicationChannelSlot().getSlot(), data);
 	}
 	
 	//

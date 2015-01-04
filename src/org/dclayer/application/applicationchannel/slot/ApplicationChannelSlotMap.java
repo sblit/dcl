@@ -1,4 +1,4 @@
-package org.dclayer.application.applicationchannelslotmap;
+package org.dclayer.application.applicationchannel.slot;
 
 import org.dclayer.application.applicationchannel.AbsApplicationChannel;
 import org.dclayer.datastructure.map.slotmap.SlotMap;
