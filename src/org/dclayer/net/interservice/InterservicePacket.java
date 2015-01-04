@@ -6,6 +6,7 @@ import org.dclayer.exception.net.parse.UnsupportedMessageTypeException;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.component.FlexNum;
+import org.dclayer.net.interservice.message.ApplicationChannelSlotAssignInterserviceMessage;
 import org.dclayer.net.interservice.message.ConnectionbaseNoticeInterserviceMessage;
 import org.dclayer.net.interservice.message.CryptoChallengeReplyInterserviceMessage;
 import org.dclayer.net.interservice.message.CryptoChallengeRequestInterserviceMessage;
@@ -41,6 +42,7 @@ public class InterservicePacket extends PacketComponent {
 	public static final int GROUP_MEMBER_LLA_REQUEST = 0x0b;
 	public static final int GROUP_MEMBER_LLA_REPLY = 0x0c;
 	public static final int NETWORK_PACKET = 0x0d;
+	public static final int APPLICATION_CHANNEL_SLOT_ASSIGN = 0x0e;
 	
 	private FlexNum type = new FlexNum(0, Integer.MAX_VALUE);
 	
@@ -63,6 +65,7 @@ public class InterservicePacket extends PacketComponent {
 				/* 0x0b */ new GroupMemberLLARequestInterserviceMessage(),
 				/* 0x0c */ new GroupMemberLLAReplyInterserviceMessage(),
 				/* 0x0d */ new NetworkPacketInterserviceMessage(networkPacketProvider),
+				/* 0x0e */ new ApplicationChannelSlotAssignInterserviceMessage()
 		};
 	}
 
@@ -155,6 +158,10 @@ public class InterservicePacket extends PacketComponent {
 	
 	public NetworkPacketInterserviceMessage setNetworkPacketInterserviceMessage() {
 		return (NetworkPacketInterserviceMessage)(this.interserviceMessage = ownInterserviceMessages[NETWORK_PACKET]);
+	}
+	
+	public ApplicationChannelSlotAssignInterserviceMessage setApplicationChannelSlotAssignInterserviceMessage() {
+		return (ApplicationChannelSlotAssignInterserviceMessage)(this.interserviceMessage = ownInterserviceMessages[APPLICATION_CHANNEL_SLOT_ASSIGN]);
 	}
 
 }

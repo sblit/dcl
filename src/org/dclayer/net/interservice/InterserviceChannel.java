@@ -14,7 +14,14 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
 import org.dclayer.net.address.Address;
+import org.dclayer.net.applicationchannel.ApplicationChannel;
+import org.dclayer.net.applicationchannel.ApplicationChannelTarget;
+import org.dclayer.net.applicationchannel.ServiceSideApplicationChannelActionListener;
 import org.dclayer.net.buf.ByteBuf;
+import org.dclayer.net.interservice.InterservicePolicy.ApplicationChannelEndpoints;
+import org.dclayer.net.interservice.applicationchannelslot.ApplicationChannelSlot;
+import org.dclayer.net.interservice.applicationchannelslot.ApplicationChannelSlotMap;
+import org.dclayer.net.interservice.message.ApplicationChannelSlotAssignInterserviceMessage;
 import org.dclayer.net.interservice.message.ConnectionbaseNoticeInterserviceMessage;
 import org.dclayer.net.interservice.message.CryptoChallengeReplyInterserviceMessage;
 import org.dclayer.net.interservice.message.CryptoChallengeRequestInterserviceMessage;
@@ -42,7 +49,7 @@ import org.dclayer.net.network.slot.GenericNetworkSlot;
 import org.dclayer.net.network.slot.NetworkSlot;
 import org.dclayer.net.network.slot.NetworkSlotMap;
 
-public class InterserviceChannel extends ThreadDataChannel implements NetworkPacketProvider {
+public class InterserviceChannel extends ThreadDataChannel implements ServiceSideApplicationChannelActionListener, NetworkPacketProvider {
 	
 	public static long VERSION = 0;
 	
@@ -62,18 +69,23 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	private DCLService dclService;
 	private InterserviceChannelActionListener interserviceChannelActionListener;
 	private CachedLLA cachedLLA;
+	private InterservicePolicy interservicePolicy;
 	
 	private AddressSlotMap remoteAddressSlotMap = new AddressSlotMap(this, true);
 	private AddressSlotMap localAddressSlotMap = new AddressSlotMap(this, false);
 	
 	private NetworkSlotMap remoteNetworkSlotMap = new NetworkSlotMap();
 	private NetworkSlotMap localNetworkSlotMap = new NetworkSlotMap();
+	
+	private ApplicationChannelSlotMap localApplicationChannelSlotMap = new ApplicationChannelSlotMap(false);
+	private ApplicationChannelSlotMap remoteApplicationChannelSlotMap = new ApplicationChannelSlotMap(true);
 
 	public InterserviceChannel(DCLService dclService, InterserviceChannelActionListener interserviceChannelActionListener, CachedLLA cachedLLA, long channelId, String channelName) {
 		super(cachedLLA.getLink(), channelId, channelName);
 		this.dclService = dclService;
 		this.interserviceChannelActionListener = interserviceChannelActionListener;
 		this.cachedLLA = cachedLLA;
+		this.interservicePolicy = cachedLLA.getInterservicePolicy();
 	}
 	
 	public CachedLLA getCachedLLA() {
@@ -87,6 +99,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	@Override
 	public synchronized void onOpenChannel(boolean initiator) {
 		this.initiator = initiator;
+		Log.msg(this, "opening channel, initiator=%s, interservice policy: %s", initiator, interservicePolicy);
 		if(initiator) {
 			this.version = VERSION;
 			sendVersion(this.version);
@@ -97,7 +110,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		
 		for(NetworkSlot remoteNetworkSlot : remoteAddressSlot.getNetworkSlots()) {
 			
-			NetworkNode remoteNetworkNode = remoteNetworkSlot.removeNetworkNode(remoteAddressSlot.getAsymmetricKeyPairAddress());
+			NetworkNode remoteNetworkNode = remoteNetworkSlot.removeNetworkNode(remoteAddressSlot.getAddress());
 			interserviceChannelActionListener.onRemoveRemoteNetworkNode(this, remoteNetworkNode);
 			
 			checkRemoteNetworkSlot(remoteNetworkSlot);
@@ -157,7 +170,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	public void startTrustedSwitch(AddressSlot addressSlot) {
 		Log.debug(this, "starting trusted switch on address slot: %s", addressSlot);
 		addressSlot.setMaxAllowedOutConnectionBase(CONNECTIONBASE_TRUSTED);
-		KeyPair keyPair = addressSlot.getAsymmetricKeyPairAddress().getKeyPair();
+		KeyPair keyPair = addressSlot.getAddress().getKeyPair();
 		addressSlot.setInCryptoChallenge(new Fixed128ByteCryptoChallenge(keyPair.getPrivateKey()));
 		sendTrustedSwitch(addressSlot, (RSAKey) keyPair.getPublicKey());
 	}
@@ -168,15 +181,33 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		addressSlot.setInCryptoChallenge(null);
 	}
 	
-	private void finishTrustedSwitch(AddressSlot addressSlot, boolean success) {
+	private synchronized void finishTrustedSwitch(AddressSlot remoteAddressSlot, boolean success) {
+		
 		if(success) {
-			Log.msg(this, "remote successfully completed crypto challenge for address slot: %s", addressSlot);
-			addressSlot.setTrustedSwitchOutCryptoChallenge(null);
-			addressSlot.setConnectionBase(CONNECTIONBASE_TRUSTED);
+			
+			Log.msg(this, "remote successfully completed crypto challenge for address slot: %s", remoteAddressSlot);
+			
+			remoteAddressSlot.setTrustedSwitchOutCryptoChallenge(null);
+			remoteAddressSlot.setConnectionBase(CONNECTIONBASE_TRUSTED);
+			
+			List<ApplicationChannel> requestApplicationChannels = interservicePolicy.getRequestApplicationChannelsForRemoteAddress(remoteAddressSlot.getAddress());
+			
+			if(requestApplicationChannels != null) {
+				for(ApplicationChannel applicationChannel : requestApplicationChannels) {
+					AddressSlot localAddressSlot = localAddressSlotMap.find(applicationChannel.getLocalAddress());
+					if(localAddressSlot != null && localAddressSlot.getConnectionBase() >= CONNECTIONBASE_TRUSTED) {
+						requestApplicationChannel(localAddressSlot, remoteAddressSlot, applicationChannel);
+					}
+				}
+			}
+			
 		} else {
-			Log.msg(this, "remote failed crypto challenge for address slot, removing: %s", addressSlot);
-			removeRemoteAddressSlot(addressSlot);
+			
+			Log.msg(this, "remote failed crypto challenge for address slot, removing: %s", remoteAddressSlot);
+			removeRemoteAddressSlot(remoteAddressSlot);
+			
 		}
+		
 	}
 	
 	private void setVersion(long version) {
@@ -185,13 +216,19 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	}
 	
 	private synchronized void setReady() {
+		
 		Log.msg(this, "InterserviceChannel ready%s, version %d", this.ready ? " (was ready before)" : "", this.version);
 		if(this.ready) return;
+		
 		this.ready = true;
 		this.interserviceChannelActionListener.onReadyChange(this, ready);
+		
+		// TODO: make sure all required addresses for application channels we need to open are acknowledged by the remote
+		
 		for(AddressSlot addressSlot : localAddressSlotMap) {
 			startTrustedSwitch(addressSlot);
 		}
+		
 	}
 	
 	public boolean isReady() {
@@ -202,12 +239,25 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	 * called when the remote notifies us of its incoming connection base
 	 * @param connectionBase the incoming connection base of the remote
 	 */
-	private void setOutConnectionBase(AddressSlot addressSlot, byte outConnectionBase) {
-		byte oldOutConnectionBase = addressSlot.getConnectionBase();
-		addressSlot.setOutConnectionBase(outConnectionBase);
+	private synchronized void setOutConnectionBase(AddressSlot localAddressSlot, byte outConnectionBase) {
+		byte oldOutConnectionBase = localAddressSlot.getConnectionBase();
+		localAddressSlot.setOutConnectionBase(outConnectionBase);
 		
-		if(oldOutConnectionBase < CONNECTIONBASE_TRUSTED && addressSlot.getConnectionBase() >= CONNECTIONBASE_TRUSTED) {
-			joinNetworks(addressSlot);
+		if(oldOutConnectionBase < CONNECTIONBASE_TRUSTED && localAddressSlot.getConnectionBase() >= CONNECTIONBASE_TRUSTED) {
+			
+			joinNetworks(localAddressSlot);
+			
+			List<ApplicationChannel> requestApplicationChannels = interservicePolicy.getRequestApplicationChannelsForLocalAddress(localAddressSlot.getAddress());
+			
+			if(requestApplicationChannels != null) {
+				for(ApplicationChannel applicationChannel : requestApplicationChannels) {
+					AddressSlot remoteAddressSlot = remoteAddressSlotMap.find(applicationChannel.getRemoteAddress());
+					if(remoteAddressSlot != null && remoteAddressSlot.getConnectionBase() >= CONNECTIONBASE_TRUSTED) {
+						requestApplicationChannel(localAddressSlot, remoteAddressSlot, applicationChannel);
+					}
+				}
+			}
+			
 		}
 	}
 	
@@ -221,24 +271,28 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 	
 	public synchronized void joinNetwork(NetworkNode networkNode) {
 		
-		AddressSlot addressSlot = localAddressSlotMap.find(networkNode.getAddress());
+		AddressSlot localAddressSlot = localAddressSlotMap.find(networkNode.getAddress());
 		
-		if(addressSlot == null) {
-			addressSlot = localAddressSlotMap.add(networkNode.getAddress());
+		if(localAddressSlot == null) {
+			
+			Address localAddress = networkNode.getAddress();
+			localAddressSlot = localAddressSlotMap.add(localAddress);
+			
 			if(isReady()) {
-				startTrustedSwitch(addressSlot);
+				startTrustedSwitch(localAddressSlot);
 			}
+			
 		}
 		
 		// if this address slot is not ready for joining networks yet, remember
 		// this node for joining it later
-		if(addressSlot.getConnectionBase() < CONNECTIONBASE_TRUSTED) {
-			addressSlot.addNetworkNodeToJoin(networkNode);
+		if(localAddressSlot.getConnectionBase() < CONNECTIONBASE_TRUSTED) {
+			localAddressSlot.addNetworkNodeToJoin(networkNode);
 			return;
 		}
 		
 		// else, just join it
-		joinNetwork(addressSlot, networkNode);
+		joinNetwork(localAddressSlot, networkNode);
 		
 	}
 	
@@ -271,6 +325,53 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		Log.debug(this, "joining %s network slot %s: %s", newSlot ? "new" : "existing", networkSlot, addressSlot);
 		
 		sendNetworkJoinNotice(addressSlot.getSlot(), newSlot ? networkSlot.getNetworkType() : null, networkSlot.getSlot());
+		
+	}
+	
+	private synchronized void requestApplicationChannel(AddressSlot localAddressSlot, AddressSlot remoteAddressSlot, ApplicationChannel applicationChannel) {
+		
+		Log.debug(this, "requesting application channel: %s", applicationChannel);
+		
+		ApplicationChannelSlot localApplicationChannelSlot = localApplicationChannelSlotMap.add(applicationChannel);
+		sendApplicationChannelSlotAssign(localApplicationChannelSlot, localAddressSlot, remoteAddressSlot);
+		
+	}
+	
+	private synchronized void acceptIncomingApplicationChannelRequest(ApplicationChannel applicationChannel, AddressSlot localAddressSlot, AddressSlot remoteAddressSlot, int remoteApplicationChannelSlotId) {
+		
+		Log.debug(this, "accepting request for application channel: %s", applicationChannel);
+		
+		ApplicationChannelSlot remoteApplicationChannelSlot = remoteApplicationChannelSlotMap.put(remoteApplicationChannelSlotId, applicationChannel);
+		ApplicationChannelSlot localApplicationChannelSlot = localApplicationChannelSlotMap.add(applicationChannel);
+		
+		localApplicationChannelSlot.setRemoteEquivalent(remoteApplicationChannelSlot);
+		remoteApplicationChannelSlot.setRemoteEquivalent(localApplicationChannelSlot);
+		
+		sendApplicationChannelSlotAssign(localApplicationChannelSlot, localAddressSlot, remoteAddressSlot);
+		
+		connectApplicationChannel(applicationChannel);
+		
+	}
+	
+	private synchronized void finishOutgoingApplicationChannelRequest(ApplicationChannelSlot localApplicationChannelSlot, int remoteApplicationChannelSlotId) {
+		
+		ApplicationChannel applicationChannel = localApplicationChannelSlot.getApplicationChannel();
+		
+		Log.debug(this, "finishing request for application channel: %s", applicationChannel);
+		
+		ApplicationChannelSlot remoteApplicationChannelSlot = remoteApplicationChannelSlotMap.put(remoteApplicationChannelSlotId, applicationChannel);
+		
+		localApplicationChannelSlot.setRemoteEquivalent(remoteApplicationChannelSlot);
+		remoteApplicationChannelSlot.setRemoteEquivalent(localApplicationChannelSlot);
+		
+		connectApplicationChannel(applicationChannel);
+		
+	}
+	
+	private synchronized void connectApplicationChannel(ApplicationChannel applicationChannel) {
+		
+		applicationChannel.setServiceSideApplicationChannelActionListener(this);
+		applicationChannel.getApplicationSideApplicationChannelActionListener().onConnected(applicationChannel);
 		
 	}
 
@@ -385,6 +486,17 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		sendOutInterservicePacket();
 	}
 	
+	private synchronized void sendApplicationChannelSlotAssign(ApplicationChannelSlot localApplicationChannelSlot, AddressSlot localAddressSlot, AddressSlot remoteAddressSlot) {
+		ApplicationChannelSlotAssignInterserviceMessage applicationChannelSlotAssignInterserviceMessage = outInterservicePacket.setApplicationChannelSlotAssignInterserviceMessage();
+		applicationChannelSlotAssignInterserviceMessage.setApplicationChannelSlot(localApplicationChannelSlot.getSlot());
+		applicationChannelSlotAssignInterserviceMessage.setSenderAddressSlot(localAddressSlot.getSlot());
+		applicationChannelSlotAssignInterserviceMessage.setReceiverAddressSlot(remoteAddressSlot.getSlot());
+		applicationChannelSlotAssignInterserviceMessage.setActionIdentifier(localApplicationChannelSlot.getApplicationChannel().getActionIdentifier());
+		sendOutInterservicePacket();
+	}
+	
+	//
+	
 	private void onNetworkJoinNotice(AddressSlot remoteAddressSlot, final int networkSlotId, NetworkType networkType) {
 		
 		if(remoteAddressSlot.getConnectionBase() < CONNECTIONBASE_TRUSTED) {
@@ -421,7 +533,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 			
 		}
 		
-		NetworkNode remoteNetworkNode = new RemoteNetworkNode(networkType, remoteAddressSlot.getAsymmetricKeyPairAddress(), remoteNetworkSlot) {
+		NetworkNode remoteNetworkNode = new RemoteNetworkNode(networkType, remoteAddressSlot.getAddress(), remoteNetworkSlot) {
 			@Override
 			public boolean onForward(NetworkPacket networkPacket) {
 				sendNetworkPacket(networkPacket, networkSlotId);
@@ -453,7 +565,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 			return;
 		}
 		
-		NetworkNode remoteNetworkNode = remoteNetworkSlot.removeNetworkNode(remoteAddressSlot.getAsymmetricKeyPairAddress());
+		NetworkNode remoteNetworkNode = remoteNetworkSlot.removeNetworkNode(remoteAddressSlot.getAddress());
 		
 		if(remoteNetworkNode == null) {
 			Log.warning(this, "remote left network slot %s which it did not join with address slot: %s", remoteNetworkSlot, remoteAddressSlot);
@@ -552,7 +664,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		AddressSlot addressSlot = remoteAddressSlotMap.get(addressSlotId);
 		
 		if(addressSlot != null) {
-			if(addressSlot.getAsymmetricKeyPairAddress().equals(remoteAddress)) {
+			if(addressSlot.getAddress().equals(remoteAddress)) {
 				Log.msg(this, "ignoring trusted switch message for address slot (slot already exists with same address): %s", addressSlot);
 				return;
 			} else {
@@ -646,7 +758,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		
 	}
 	
-	public void onReceiveConnectionbaseNoticeInterserviceMessage(ConnectionbaseNoticeInterserviceMessage connectionbaseNoticeInterserviceMessage) {
+	public synchronized void onReceiveConnectionbaseNoticeInterserviceMessage(ConnectionbaseNoticeInterserviceMessage connectionbaseNoticeInterserviceMessage) {
 
 		byte outConnectionBase = connectionbaseNoticeInterserviceMessage.getConnectionBase();
 		
@@ -663,7 +775,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		
 	}
 	
-	public void onReceiveNetworkJoinNoticeInterserviceMessage(NetworkJoinNoticeInterserviceMessage networkJoinNoticeInterserviceMessage) {
+	public synchronized void onReceiveNetworkJoinNoticeInterserviceMessage(NetworkJoinNoticeInterserviceMessage networkJoinNoticeInterserviceMessage) {
 
 		int addressSlotId = networkJoinNoticeInterserviceMessage.getAddressSlot();
 		int networkSlotId = networkJoinNoticeInterserviceMessage.getNetworkSlot();
@@ -687,7 +799,7 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		
 	}
 	
-	public void onReceiveNetworkLeaveNoticeInterserviceMessage(NetworkLeaveNoticeInterserviceMessage networkLeaveNoticeInterserviceMessage) {
+	public synchronized void onReceiveNetworkLeaveNoticeInterserviceMessage(NetworkLeaveNoticeInterserviceMessage networkLeaveNoticeInterserviceMessage) {
 		
 		int addressSlotId = networkLeaveNoticeInterserviceMessage.getAddressSlot();
 		int networkSlotId = networkLeaveNoticeInterserviceMessage.getNetworkSlot();
@@ -710,23 +822,23 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		
 	}
 	
-	public void onReceiveIntegrationRequestInterserviceMessage(IntegrationRequestInterserviceMessage integrationRequestInterserviceMessage) {
+	public synchronized void onReceiveIntegrationRequestInterserviceMessage(IntegrationRequestInterserviceMessage integrationRequestInterserviceMessage) {
 		
 	}
 	
-	public void onReceiveIntegrationConnectRequestInterserviceMessage(IntegrationConnectRequestInterserviceMessage integrationConnectRequestInterserviceMessage) {
+	public synchronized void onReceiveIntegrationConnectRequestInterserviceMessage(IntegrationConnectRequestInterserviceMessage integrationConnectRequestInterserviceMessage) {
 		
 	}
 	
-	public void onReceiveGroupMemberLLARequestInterserviceMessage(GroupMemberLLARequestInterserviceMessage groupMemberLLARequestInterserviceMessage) {
+	public synchronized void onReceiveGroupMemberLLARequestInterserviceMessage(GroupMemberLLARequestInterserviceMessage groupMemberLLARequestInterserviceMessage) {
 		
 	}
 	
-	public void onReceiveGroupMemberLLAReplyInterserviceMessage(GroupMemberLLAReplyInterserviceMessage groupMemberLLAReplyInterserviceMessage) {
+	public synchronized void onReceiveGroupMemberLLAReplyInterserviceMessage(GroupMemberLLAReplyInterserviceMessage groupMemberLLAReplyInterserviceMessage) {
 		
 	}
 	
-	public void onReceiveNetworkPacketInterserviceMessage(NetworkPacketInterserviceMessage networkPacketInterserviceMessage) {
+	public synchronized void onReceiveNetworkPacketInterserviceMessage(NetworkPacketInterserviceMessage networkPacketInterserviceMessage) {
 
 		NetworkPacket networkPacket = networkPacketInterserviceMessage.getNetworkPacket();
 		
@@ -739,11 +851,71 @@ public class InterserviceChannel extends ThreadDataChannel implements NetworkPac
 		onReceiveNetworkPacket(networkPacket);
 		
 	}
+	
+	public synchronized void onReceiveApplicationChannelSlotAssignInterserviceMessage(ApplicationChannelSlotAssignInterserviceMessage applicationChannelSlotAssignInterserviceMessage) {
+		
+		int localAddressSlotId = applicationChannelSlotAssignInterserviceMessage.getReceiverAddressSlot();
+		int remoteAddressSlotId = applicationChannelSlotAssignInterserviceMessage.getSenderAddressSlot();
+		
+		int remoteApplicationChannelSlotId = applicationChannelSlotAssignInterserviceMessage.getApplicationChannelSlot();
+		
+		String actionIdentifier = applicationChannelSlotAssignInterserviceMessage.getActionIdentifier();
+		
+		AddressSlot remoteAddressSlot = remoteAddressSlotMap.get(remoteAddressSlotId);
+		
+		if(remoteAddressSlot == null) {
+			Log.msg(this, "ignoring application channel slot assign message for empty remote address slot id %d", remoteAddressSlotId);
+			return;
+		}
+		
+		if(remoteAddressSlot.getConnectionBase() < CONNECTIONBASE_TRUSTED) {
+			Log.msg(this, "ignoring application channel slot assign message for remote address slot (incoming connection base insufficient): %s", remoteAddressSlot);
+			return;
+		}
+		
+		AddressSlot localAddressSlot = localAddressSlotMap.get(localAddressSlotId);
+		
+		if(localAddressSlot == null) {
+			Log.msg(this, "ignoring application channel slot assign message for empty locla address slot id %d", localAddressSlotId);
+			return;
+		}
+		
+		Log.debug(this, "received application channel slot assign message for local address slot %s, remote address slot %s, application channel slot id %d and action identifier %s", localAddressSlot, remoteAddressSlot, remoteApplicationChannelSlotId, actionIdentifier);
+		
+		ApplicationChannelTarget applicationChannelTarget = new ApplicationChannelTarget(remoteAddressSlot.getAddress(), actionIdentifier);
+		
+		ApplicationChannelSlot localApplicationChannelSlot = localApplicationChannelSlotMap.find(applicationChannelTarget);
+		
+		if(localApplicationChannelSlot == null) {
+			
+			ApplicationChannel applicationChannel = interservicePolicy.checkIncomingApplicationChannel(applicationChannelTarget);
+			if(applicationChannel == null) {
+				Log.msg(this, "ignoring application channel slot assign message, not accepting application channel request");
+			} else {
+				acceptIncomingApplicationChannelRequest(applicationChannel, localAddressSlot, remoteAddressSlot, remoteApplicationChannelSlotId);
+			}
+			
+		} else {
+			
+			finishOutgoingApplicationChannelRequest(localApplicationChannelSlot, remoteApplicationChannelSlotId);
+			
+		}
+		
+	}
+	
+	//
 
 	@Override
 	public NetworkPacket getNetworkPacket(int slot) {
 		NetworkSlot networkSlot = localNetworkSlotMap.get(slot);
 		return networkSlot == null ? null : networkSlot.getNetworkPacket();
+	}
+	
+	//
+
+	@Override
+	public void onData(ApplicationChannel applicationChannel, Data data) {
+		
 	}
 	
 }

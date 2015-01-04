@@ -1,14 +1,16 @@
 package org.dclayer.application.applicationchannelslotmap;
 
-import org.dclayer.application.applicationchannel.ApplicationChannel;
-import org.dclayer.crypto.key.Key;
+import org.dclayer.application.applicationchannel.AbsApplicationChannel;
 import org.dclayer.datastructure.map.slotmap.SlotMap;
+import org.dclayer.net.applicationchannel.ApplicationChannelTarget;
 
-public class ApplicationChannelSlotMap extends SlotMap<ApplicationChannel, Key, ApplicationChannelSlot> {
+public class ApplicationChannelSlotMap extends SlotMap<AbsApplicationChannel, ApplicationChannelTarget, ApplicationChannelSlot> {
 
 	@Override
-	public ApplicationChannelSlot makeSlot(int slotId, ApplicationChannel applicationChannel) {
-		return new ApplicationChannelSlot(slotId, applicationChannel);
+	public ApplicationChannelSlot makeSlot(int slotId, AbsApplicationChannel applicationChannel) {
+		ApplicationChannelSlot applicationChannelSlot = new ApplicationChannelSlot(slotId, applicationChannel);
+		applicationChannel.setApplicationChannelSlot(applicationChannelSlot);
+		return applicationChannelSlot;
 	}
 	
 }

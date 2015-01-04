@@ -3,8 +3,8 @@ package org.dclayer.net.network;
 import java.util.Set;
 
 import org.dclayer.meta.HierarchicalLevel;
-import org.dclayer.net.NeighborRequest;
 import org.dclayer.net.address.Address;
+import org.dclayer.net.applicationchannel.ApplicationChannelTarget;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.slot.GenericNetworkSlot;
 
@@ -12,7 +12,7 @@ public abstract class ApplicationNetworkInstance extends NetworkInstance {
 
 	private GenericNetworkSlot<? extends NetworkNode> networkSlot;
 	
-	private Set<NeighborRequest> requestedNeighbors;
+	private Set<ApplicationChannelTarget> requestedApplicationChannelTargets;
 	
 	public ApplicationNetworkInstance(HierarchicalLevel parentHierarchicalLevel, NetworkType networkType, Address address) {
 		super(parentHierarchicalLevel, networkType, address, true);
@@ -26,12 +26,12 @@ public abstract class ApplicationNetworkInstance extends NetworkInstance {
 		return networkSlot;
 	}
 	
-	public void setRequestedNeighbors(Set<NeighborRequest> requestedNeighbors) {
-		this.requestedNeighbors = requestedNeighbors;
+	public void setRequestedApplicationChannelTargets(Set<ApplicationChannelTarget> requestedApplicationChannelTargets) {
+		this.requestedApplicationChannelTargets = requestedApplicationChannelTargets;
 	}
 	
-	public Set<NeighborRequest> getRequestedNeighbors() {
-		return requestedNeighbors;
+	public Set<ApplicationChannelTarget> getRequestedApplicationChannelTargets() {
+		return requestedApplicationChannelTargets;
 	}
 	
 	@Override

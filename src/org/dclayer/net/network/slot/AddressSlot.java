@@ -8,6 +8,7 @@ import org.dclayer.datastructure.map.slotmap.Slot;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.address.Address;
+import org.dclayer.net.applicationchannel.ApplicationChannel;
 import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.network.NetworkNode;
 
@@ -17,7 +18,7 @@ public class AddressSlot extends Slot<Address> implements HierarchicalLevel {
 	private HierarchicalLevel parentHierarchicalLevel;
 	private boolean remote = false;
 	
-	private Address asymmetricKeyPairAddress;
+	private Address address;
 	private CryptoChallenge inCryptoChallenge;
 	private CryptoChallenge trustedSwitchOutCryptoChallenge;
 	
@@ -27,15 +28,15 @@ public class AddressSlot extends Slot<Address> implements HierarchicalLevel {
 	private List<NetworkSlot> networkSlots = new LinkedList<>();
 	private List<NetworkNode> networkNodesToJoin = new LinkedList<>();
 	
-	public AddressSlot(HierarchicalLevel parentHierarchicalLevel, boolean remote, int slotId, Address asymmetricKeyPairAddress) {
+	public AddressSlot(HierarchicalLevel parentHierarchicalLevel, boolean remote, int slotId, Address address) {
 		super(slotId);
 		this.parentHierarchicalLevel = parentHierarchicalLevel;
 		this.remote = remote;
-		this.asymmetricKeyPairAddress = asymmetricKeyPairAddress;
+		this.address = address;
 	}
 	
-	public Address getAsymmetricKeyPairAddress() {
-		return asymmetricKeyPairAddress;
+	public Address getAddress() {
+		return address;
 	}
 	
 	public void setInCryptoChallenge(CryptoChallenge inCryptoChallenge) {
@@ -104,12 +105,12 @@ public class AddressSlot extends Slot<Address> implements HierarchicalLevel {
 
 	@Override
 	public Address getSearchObject() {
-		return asymmetricKeyPairAddress;
+		return address;
 	}
 	
 	@Override
 	public String contentToString() {
-		return String.format("%s, %s, %d network slots", remote ? "remote" : "local", asymmetricKeyPairAddress, networkSlots.size());
+		return String.format("%s, %s, %d network slots", remote ? "remote" : "local", address, networkSlots.size());
 	}
 
 	@Override

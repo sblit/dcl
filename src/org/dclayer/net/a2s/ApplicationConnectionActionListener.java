@@ -5,6 +5,7 @@ import java.net.Socket;
 import org.dclayer.listener.net.NetworkInstanceListener;
 import org.dclayer.net.Data;
 import org.dclayer.net.address.Address;
+import org.dclayer.net.applicationchannel.ApplicationChannel;
 import org.dclayer.net.interservice.InterservicePolicy;
 import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.network.NetworkInstance;
@@ -18,6 +19,9 @@ public interface ApplicationConnectionActionListener extends NetworkInstanceList
 	public LLA getLocalLLA();
 	
 	public Data getServiceIgnoreData();
+	
+	public InterservicePolicy makeDefaultIncomingApplicationChannelInterservicePolicy(NetworkInstance networkInstance, ApplicationChannel applicationChannel, LLA remoteLLA);
+	public InterservicePolicy makeDefaultOutgoingApplicationChannelInterservicePolicy(NetworkInstance networkInstance, ApplicationChannel applicationChannel, LLA remoteLLA);
 	
 	public void connect(LLA lla, InterservicePolicy interservicePolicy);
 	public void prepareForIncomingConnection(LLA lla, InterservicePolicy interservicePolicy, Data ignoreData);

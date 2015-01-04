@@ -3,29 +3,12 @@ package org.dclayer.application.applicationchannel;
 import java.io.BufferedOutputStream;
 import java.io.InputStream;
 
-import org.dclayer.application.networktypeslotmap.NetworkEndpointSlot;
-import org.dclayer.crypto.Crypto;
-import org.dclayer.crypto.key.Key;
-import org.dclayer.net.Data;
+import org.dclayer.net.applicationchannel.ApplicationChannelTarget;
 
-public class DCLApplicationChannel implements ApplicationChannel {
-	
-	private Data remotePublicKeyFingerprint;
-	
-	public DCLApplicationChannel(Key remotePublicKey, String actionIdentifier, NetworkEndpointSlot networkEndpointSlot) {
-		this.remotePublicKeyFingerprint = Crypto.sha1(remotePublicKey.toData());
-	}
+public class DCLApplicationChannel extends AbsApplicationChannel {
 
-	@Override
-	public Key getRemotePublicKey() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public String getActionIdentifier() {
-		// TODO Auto-generated method stub
-		return null;
+	public DCLApplicationChannel(ApplicationChannelTarget applicationChannelTarget, ApplicationChannelActionListener applicationChannelActionListener, boolean locallyInitiated) {
+		super(applicationChannelTarget, applicationChannelActionListener, locallyInitiated);
 	}
 
 	@Override
@@ -39,10 +22,10 @@ public class DCLApplicationChannel implements ApplicationChannel {
 		// TODO Auto-generated method stub
 		return null;
 	}
-	
+
 	@Override
-	public String toString() {
-		return String.format("DCL application channel (remote public key fingerprint %s)", remotePublicKeyFingerprint);
+	protected String getName() {
+		return "DCLApplicationChannel";
 	}
 
 }

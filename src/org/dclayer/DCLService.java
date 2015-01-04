@@ -7,7 +7,6 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Random;
 
 import org.dclayer.PreLinkCommunicationManager.Result;
 import org.dclayer.crypto.Crypto;
@@ -23,6 +22,7 @@ import org.dclayer.net.Data;
 import org.dclayer.net.a2s.ApplicationConnection;
 import org.dclayer.net.a2s.ApplicationConnectionActionListener;
 import org.dclayer.net.address.Address;
+import org.dclayer.net.applicationchannel.ApplicationChannel;
 import org.dclayer.net.buf.DataByteBuf;
 import org.dclayer.net.crisp.CrispMessageReceiver;
 import org.dclayer.net.crisp.CrispPacket;
@@ -36,7 +36,6 @@ import org.dclayer.net.link.LinkSendInterface;
 import org.dclayer.net.link.OnLinkActionListener;
 import org.dclayer.net.link.channel.data.DataChannel;
 import org.dclayer.net.llacache.CachedLLA;
-import org.dclayer.net.llacache.InetSocketLLA;
 import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.llacache.LLACache;
 import org.dclayer.net.lladatabase.LLADatabase;
@@ -286,21 +285,45 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	
 	//
 	
+	public InterservicePolicy makeDefaultInterservicePolicy() {
+		return new InterservicePolicy();
+	}
+	
+	@Override
+	public InterservicePolicy makeDefaultIncomingApplicationChannelInterservicePolicy(NetworkInstance networkInstance, ApplicationChannel applicationChannel, LLA remoteLLA) {
+		// TODO restrict
+		return new InterservicePolicy()
+				.allowIncomingApplicationChannel(applicationChannel);
+	}
+	
+	@Override
+	public InterservicePolicy makeDefaultOutgoingApplicationChannelInterservicePolicy(NetworkInstance networkInstance, ApplicationChannel applicationChannel, LLA remoteLLA) {
+		return new InterservicePolicy()
+				.requestApplicationChannel(applicationChannel);
+	}
+	
+	//
+	
 	@Override
 	public synchronized void connect(LLA lla, InterservicePolicy interservicePolicy) {
+		// TODO: do not connect if we're connected already
 		CachedLLA cachedLLA = getLLACache().getCachedLLA(lla, true);
 		cachedLLA.setInterservicePolicy(interservicePolicy);
 		connectionInitiationManager.connect(cachedLLA);
 	}
 	
+	public void connect(LLA lla) {
+		connect(lla, makeDefaultInterservicePolicy());
+	}
+	
 	/**
-	 * sends a random packet to the given LLA in order to punch a hole in a local NAT
+	 * sends a packet to the given LLA in order to punch a hole in a local NAT
 	 */
 	@Override
-	public void prepareForIncomingConnection(LLA lla, InterservicePolicy interservicePolicy, Data ignoreData) {
+	public void prepareForIncomingConnection(LLA lla, InterservicePolicy interservicePolicy, Data punchData) {
 		CachedLLA cachedLLA = getLLACache().getCachedLLA(lla, true);
 		cachedLLA.setInterservicePolicy(interservicePolicy);
-		connectionInitiationManager.punch(cachedLLA, ignoreData);
+		connectionInitiationManager.punch(cachedLLA, punchData);
 	}
 	
 	//
@@ -333,6 +356,9 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 				
 				if(result.done) {
 					cachedLLA = llaCache.getIPPortCachedLLA(inetAddress, port, true);
+					if(cachedLLA.getInterservicePolicy() == null) {
+						cachedLLA.setInterservicePolicy(makeDefaultInterservicePolicy());
+					}
 					cachedLLA.setStatus(CachedLLA.CONNECTING_PRELINK);
 					cachedLLA.setFirstLinkPacketPrefixData(result.firstLinkPacketPrefixData);
 				}

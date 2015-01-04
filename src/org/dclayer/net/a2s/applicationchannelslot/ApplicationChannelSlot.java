@@ -1,20 +1,21 @@
-package org.dclayer.application.applicationchannelslotmap;
+package org.dclayer.net.a2s.applicationchannelslot;
 
-import org.dclayer.application.applicationchannel.AbsApplicationChannel;
 import org.dclayer.datastructure.map.slotmap.Slot;
+import org.dclayer.net.applicationchannel.ApplicationChannel;
 import org.dclayer.net.applicationchannel.ApplicationChannelTarget;
 
 
 public class ApplicationChannelSlot extends Slot<ApplicationChannelTarget> {
 	
-	private AbsApplicationChannel applicationChannel;
+	private ApplicationChannel applicationChannel;
 	
-	public ApplicationChannelSlot(int slotId, AbsApplicationChannel applicationChannel) {
+	public ApplicationChannelSlot(int slotId, ApplicationChannel applicationChannel) {
 		super(slotId);
 		this.applicationChannel = applicationChannel;
+		applicationChannel.setApplicationConnectionApplicationChannelSlot(this);
 	}
 	
-	public AbsApplicationChannel getApplicationChannel() {
+	public ApplicationChannel getApplicationChannel() {
 		return applicationChannel;
 	}
 

@@ -2,6 +2,7 @@ package org.dclayer.net.a2s;
 
 import org.dclayer.net.a2s.message.AddressPublicKeyMessageI;
 import org.dclayer.net.a2s.message.ApplicationChannelAcceptMessageI;
+import org.dclayer.net.a2s.message.ApplicationChannelConnectedMessageI;
 import org.dclayer.net.a2s.message.ApplicationChannelIncomingRequestMessageI;
 import org.dclayer.net.a2s.message.ApplicationChannelOutgoingRequestMessageI;
 import org.dclayer.net.a2s.message.DataMessageI;
@@ -28,5 +29,6 @@ public abstract class A2SMessage extends A2SPacketComponent {
 	public abstract ApplicationChannelOutgoingRequestMessageI setApplicationChannelOutgoingRequestMessage();
 	public abstract ApplicationChannelIncomingRequestMessageI setApplicationChannelIncomingRequestMessage();
 	public abstract ApplicationChannelAcceptMessageI setApplicationChannelAcceptMessage();
+	public abstract ApplicationChannelConnectedMessageI setApplicationChannelConnectedMessage();
 	
 }

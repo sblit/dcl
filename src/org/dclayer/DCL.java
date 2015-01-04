@@ -7,16 +7,13 @@ import java.net.UnknownHostException;
 import java.util.LinkedList;
 
 import org.dclayer.crypto.hash.HashAlgorithm;
-import org.dclayer.crypto.key.Key;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.apbr.APBRNetworkType;
 import org.dclayer.net.circle.CircleNetworkType;
-import org.dclayer.net.interservice.InterservicePolicy;
 import org.dclayer.net.llacache.InetSocketLLA;
 import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.lladatabase.LLADatabase;
-import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkType;
 
 public class DCL {
@@ -29,10 +26,6 @@ public class DCL {
 	public static final NetworkType[] DEFAULT_NETWORK_TYPES = new NetworkType[] { new CircleNetworkType(HashAlgorithm.SHA1, 2) };
 	
 	public static final String ACTION_IDENTIFIER_APPLICATION_CHANNEL_PREFIX = "org.dclayer.applicationchannel/";
-	
-	public static InterservicePolicy defaultApplicationChannelInterservicePolicy(NetworkInstance networkInstance, String actionIdentifier, LLA remoteLLA, Key remotePublicKey) {
-		return new InterservicePolicy(); // TODO restrict
-	}
 
 	public static void main(String[] args) throws ParseException {
 		

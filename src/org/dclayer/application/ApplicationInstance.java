@@ -9,6 +9,7 @@ import java.net.Socket;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.dclayer.application.applicationchannel.AbsApplicationChannel;
 import org.dclayer.application.applicationchannel.ApplicationChannelActionListener;
 import org.dclayer.application.applicationchannel.DCLApplicationChannel;
 import org.dclayer.application.applicationchannelslotmap.ApplicationChannelSlot;
@@ -32,6 +33,7 @@ import org.dclayer.net.a2s.message.ApplicationChannelOutgoingRequestMessageI;
 import org.dclayer.net.a2s.message.DataMessageI;
 import org.dclayer.net.a2s.rev0.Rev0Message;
 import org.dclayer.net.address.Address;
+import org.dclayer.net.applicationchannel.ApplicationChannelTarget;
 import org.dclayer.net.buf.StreamByteBuf;
 import org.dclayer.net.component.AbsKeyComponent;
 import org.dclayer.net.componentinterface.AbsKeyComponentI;
@@ -240,11 +242,16 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 		sendDataMessage(networkEndpointSlot, destinationAddressData, data);
 	}
 	
-	public void requestApplicationChannel(NetworkEndpointSlot networkEndpointSlot, String actionIdentifier, Key remotePublicKey) {
+	public synchronized void requestApplicationChannel(NetworkEndpointSlot networkEndpointSlot, String actionIdentifier, Key remotePublicKey, ApplicationChannelActionListener applicationChannelActionListener) {
 		
-		ApplicationChannelSlot applicationChannelSlot = applicationChannelSlotMap.find(remotePublicKey);
+		Address remoteAddress = new Address<>(KeyPair.fromPublicKey(remotePublicKey));
+		ApplicationChannelTarget applicationChannelTarget = new ApplicationChannelTarget(remoteAddress, actionIdentifier);
+		
+		ApplicationChannelSlot applicationChannelSlot = applicationChannelSlotMap.find(applicationChannelTarget);
 		if(applicationChannelSlot == null) {
-			applicationChannelSlot = applicationChannelSlotMap.add(new DCLApplicationChannel(remotePublicKey, actionIdentifier, networkEndpointSlot));
+			applicationChannelSlot = applicationChannelSlotMap.add(new DCLApplicationChannel(applicationChannelTarget, applicationChannelActionListener, true));
+		} else {
+			applicationChannelSlot.getApplicationChannel().setApplicationChannelActionListener(applicationChannelActionListener);
 		}
 		
 		sendApplicationChannelRequestMessage(networkEndpointSlot.getSlot(), applicationChannelSlot.getSlot(), actionIdentifier, remotePublicKey);
@@ -355,7 +362,10 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 		
 		if(applicationChannelActionListener != null) {
 			
-			ApplicationChannelSlot applicationChannelSlot = applicationChannelSlotMap.add(new DCLApplicationChannel(remotePublicKey, actionIdentifierSuffix, networkEndpointSlot));
+			Address remoteAddress = new Address<>(KeyPair.fromPublicKey(remotePublicKey));
+			ApplicationChannelTarget applicationChannelTarget = new ApplicationChannelTarget(remoteAddress, actionIdentifierSuffix);
+			ApplicationChannelSlot applicationChannelSlot = applicationChannelSlotMap.add(new DCLApplicationChannel(applicationChannelTarget, applicationChannelActionListener, false));
+			
 			sendApplicationChannelAcceptMessage(networkSlotId, applicationChannelSlot.getSlot(), actionIdentifierSuffix, remotePublicKey, senderLLA, ignoreData);
 			
 		}
@@ -370,6 +380,15 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 	@Override
 	public synchronized void onReceiveApplicationChannelAcceptMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA, Data ignoreData) {
 		// TODO illegal
+	}
+	
+	@Override
+	public synchronized void onReceiveApplicationChannelConnectMessage(int channelSlotId) {
+		
+		ApplicationChannelSlot applicationChannelSlot = applicationChannelSlotMap.get(channelSlotId);
+		AbsApplicationChannel applicationChannel = applicationChannelSlot.getApplicationChannel();
+		applicationChannel.getApplicationChannelActionListener().onApplicationChannelConnected(applicationChannel);
+		
 	}
 	
 	//

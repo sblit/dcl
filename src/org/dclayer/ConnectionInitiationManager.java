@@ -46,7 +46,7 @@ public class ConnectionInitiationManager extends Thread implements CachedLLAStat
 	public void run() {
 		List<LLA> llas = dclService.getLLAs();
 		for(LLA lla : llas) {
-			dclService.connect(lla, null);
+			dclService.connect(lla);
 		}
 	}
 	

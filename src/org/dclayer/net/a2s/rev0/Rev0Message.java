@@ -7,8 +7,10 @@ import org.dclayer.net.PacketComponent;
 import org.dclayer.net.a2s.A2SMessage;
 import org.dclayer.net.a2s.A2SMessageReceiver;
 import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
+import org.dclayer.net.a2s.message.ApplicationChannelConnectedMessageI;
 import org.dclayer.net.a2s.rev0.message.AddressPublicKeyMessage;
 import org.dclayer.net.a2s.rev0.message.ApplicationChannelAcceptMessage;
+import org.dclayer.net.a2s.rev0.message.ApplicationChannelConnectedMessage;
 import org.dclayer.net.a2s.rev0.message.ApplicationChannelIncomingRequestMessage;
 import org.dclayer.net.a2s.rev0.message.ApplicationChannelOutgoingRequestMessage;
 import org.dclayer.net.a2s.rev0.message.DataMessage;
@@ -40,6 +42,7 @@ public class Rev0Message extends A2SMessage {
 	public static final int APPLICATION_CHANNEL_OUTGOING_REQUEST = 10;
 	public static final int APPLICATION_CHANNEL_INCOMING_REQUEST = 11;
 	public static final int APPLICATION_CHANNEL_ACCEPT = 12;
+	public static final int APPLICATION_CHANNEL_CONNECTED = 13;
 
 	private A2SRevisionSpecificMessage message;
 	
@@ -56,7 +59,8 @@ public class Rev0Message extends A2SMessage {
 		new KeyCryptoResponseDataMessage(),
 		new ApplicationChannelOutgoingRequestMessage(),
 		new ApplicationChannelIncomingRequestMessage(),
-		new ApplicationChannelAcceptMessage()
+		new ApplicationChannelAcceptMessage(),
+		new ApplicationChannelConnectedMessage()
 	};
 
 	@Override
@@ -170,6 +174,11 @@ public class Rev0Message extends A2SMessage {
 	@Override
 	public ApplicationChannelAcceptMessage setApplicationChannelAcceptMessage() {
 		return (ApplicationChannelAcceptMessage)(this.message = messages[APPLICATION_CHANNEL_ACCEPT]);
+	}
+
+	@Override
+	public ApplicationChannelConnectedMessageI setApplicationChannelConnectedMessage() {
+		return (ApplicationChannelConnectedMessage)(this.message = messages[APPLICATION_CHANNEL_CONNECTED]);
 	}
 
 }
