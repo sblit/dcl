@@ -15,9 +15,10 @@ public abstract class CryptoChallenge {
 	public Key getKey() {
 		return key;
 	}
+
+	public abstract Data makeChallengeData();
+	public abstract boolean verifySolvedData(Data solvedData) throws CryptoException;
 	
-	public abstract Data solveCryptoChallenge(Data plainData) throws CryptoException;
-	public abstract boolean verifyCipherData(Data cipherData) throws CryptoException;
-	public abstract Data makeRandomPlainData();
+	public abstract Data solveChallengeData(Data challengeData) throws CryptoException;
 	
 }

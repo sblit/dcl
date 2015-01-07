@@ -23,7 +23,7 @@ public class Fixed128ByteCryptoChallenge extends CryptoChallenge {
 
 	// crypto challenge resolution
 	
-	public Data solveCryptoChallenge(Data plainData) throws CryptoException {
+	public Data solveChallengeData(Data plainData) throws CryptoException {
 		Data cryptData = new Data(plainData.length() + PLAINDATA_PADDING);
 		byte[] padding = new byte[PLAINDATA_PADDING];
 		(new Random()).nextBytes(padding); // TODO is a simple random padding sufficient?
@@ -34,14 +34,14 @@ public class Fixed128ByteCryptoChallenge extends CryptoChallenge {
 
 	// crypto challenge verification
 
-	public Data makeRandomPlainData() {
+	public Data makeChallengeData() {
 		byte[] bytes = new byte[CHALLENGE_DATA_MAXNUMBYTES];
 		(new Random()).nextBytes(bytes);
 		this.plainData = new Data(bytes);
 		return plainData;
 	}
 
-	public boolean verifyCipherData(Data cipherData) throws CryptoException {
+	public boolean verifySolvedData(Data cipherData) throws CryptoException {
 		Data plainData = key.decrypt(cipherData);
 		return (plainData.length() == (CHALLENGE_DATA_MAXNUMBYTES+PLAINDATA_PADDING))
 				&& this.plainData.equals(0, plainData, PLAINDATA_PADDING, CHALLENGE_DATA_MAXNUMBYTES);
