@@ -13,4 +13,6 @@ public interface DataComponentI {
 	public void setData(PacketComponentI packetComponent) throws BufException;
 	public void getData(PacketComponentI packetComponent) throws BufException, ParseException;
 	
+	public int lengthForDataLength(int dataLength);
+	
 }

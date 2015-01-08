@@ -14,6 +14,9 @@ public abstract class RSAKey extends Key {
 	
 	private RSAKeyParameters rsaKeyParameters;
 	
+	private OAEPEncoding encryptionOAEP;
+	private OAEPEncoding decryptionOAEP;
+	
 	public RSAKey(boolean isPrivate, final BigInteger modulus, final BigInteger exponent) throws InsufficientKeySizeException {
 		this(new RSAKeyParameters(isPrivate, modulus, exponent));
 	}
@@ -21,6 +24,16 @@ public abstract class RSAKey extends Key {
 	public RSAKey(RSAKeyParameters rsaKeyParameters) throws InsufficientKeySizeException {
 		super(rsaKeyParameters.getModulus().bitLength());
 		this.rsaKeyParameters = rsaKeyParameters;
+		
+		this.encryptionOAEP = new OAEPEncoding(new RSAEngine());
+		this.encryptionOAEP.init(true, rsaKeyParameters);
+		
+		this.decryptionOAEP = new OAEPEncoding(new RSAEngine());
+		this.decryptionOAEP.init(false, rsaKeyParameters);
+	}
+	
+	public RSAKeyParameters getRSAKeyParameters() {
+		return rsaKeyParameters;
 	}
 
 	@Override
@@ -36,6 +49,11 @@ public abstract class RSAKey extends Key {
 	@Override
 	public int getBlockNumBytes() {
 		return getNumBits()/8;
+	}
+	
+	@Override
+	public int getMaxEncryptionBlockNumBytes() {
+		return encryptionOAEP.getInputBlockSize();
 	}
 	
 	public BigInteger getModulus() {
@@ -60,36 +78,90 @@ public abstract class RSAKey extends Key {
 	
 	@Override
 	public Data encrypt(Data plainData) throws InvalidCipherCryptoException {
+
+		Data cipherData = null;
 		
-		OAEPEncoding oaepEncoding = new OAEPEncoding(new RSAEngine());
-		oaepEncoding.init(true, rsaKeyParameters);
-        
-		byte[] cipherBytes;
-		try {
-            cipherBytes = oaepEncoding.processBlock(plainData.getData(), plainData.offset(), plainData.length());
-        } catch (InvalidCipherTextException e) {
-        	throw new InvalidCipherCryptoException(e);
-        }
-        
-        return new Data(cipherBytes);
-        
+		if(plainData.length() > getMaxEncryptionBlockNumBytes()) {
+			cipherData = new Data(getBlockNumBytes() * (((plainData.length() - 1) / getMaxEncryptionBlockNumBytes()) + 1));
+		}
+
+		synchronized(encryptionOAEP) {
+			
+			try {
+				
+				for(int plainDataOffset = 0, cipherDataOffset = 0;
+						plainDataOffset < plainData.length();
+						plainDataOffset += getMaxEncryptionBlockNumBytes()) {
+					
+					byte[] block = encryptionOAEP.processBlock(
+							plainData.getData(), 
+							plainData.offset() + plainDataOffset,
+							Math.min(plainData.length() - plainDataOffset, getMaxEncryptionBlockNumBytes()));
+					
+					if(cipherData == null) {
+						cipherData = new Data(block);
+					} else {
+						cipherData.setBytes(cipherDataOffset, block, 0, block.length);
+					}
+					
+					cipherDataOffset += block.length;
+					
+				}
+				
+			} catch (InvalidCipherTextException e) {
+				throw new InvalidCipherCryptoException(e);
+			}
+
+		}
+
+		return cipherData;
+
 	}
-	
+
 	@Override
 	public Data decrypt(Data cipherData) throws InvalidCipherCryptoException {
 		
-		OAEPEncoding oaepEncoding = new OAEPEncoding(new RSAEngine());
-		oaepEncoding.init(false, rsaKeyParameters);
-        
-		byte[] cipherBytes;
-        try {
-            cipherBytes = oaepEncoding.processBlock(cipherData.getData(), cipherData.offset(), cipherData.length());
-        } catch (InvalidCipherTextException e) {
-        	throw new InvalidCipherCryptoException(e);
-        }
-        
-        return new Data(cipherBytes);
-        
+		Data plainData = null;
+		
+		if(cipherData.length() > getBlockNumBytes()) {
+			plainData = new Data(getMaxEncryptionBlockNumBytes() * (((cipherData.length() - 1) / getBlockNumBytes()) + 1));
+		}
+		
+		int plainDataOffset = 0;
+
+		synchronized(decryptionOAEP) {
+
+			try {
+				
+				for(int cipherDataOffset = 0;
+						cipherDataOffset < cipherData.length();
+						cipherDataOffset += getBlockNumBytes()) {
+					
+					byte[] block = decryptionOAEP.processBlock(
+							cipherData.getData(), 
+							cipherData.offset() + cipherDataOffset, 
+							Math.min(cipherData.length() - cipherDataOffset, getBlockNumBytes()));
+					
+					if(plainData == null) {
+						plainData = new Data(block);
+					} else {
+						plainData.setBytes(plainDataOffset, block, 0, block.length);
+					}
+					
+					plainDataOffset += block.length;
+					
+				}
+				
+			} catch (InvalidCipherTextException e) {
+				throw new InvalidCipherCryptoException(e);
+			}
+
+		}
+		
+		plainData.relativeReset(0, plainDataOffset);
+		
+		return plainData;
+
 	}
 
 	@Override

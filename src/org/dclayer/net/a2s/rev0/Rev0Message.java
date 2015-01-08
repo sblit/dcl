@@ -7,8 +7,7 @@ import org.dclayer.net.PacketComponent;
 import org.dclayer.net.a2s.A2SMessage;
 import org.dclayer.net.a2s.A2SMessageReceiver;
 import org.dclayer.net.a2s.A2SRevisionSpecificMessage;
-import org.dclayer.net.a2s.message.ApplicationChannelConnectedMessageI;
-import org.dclayer.net.a2s.message.ApplicationChannelDataMessageI;
+import org.dclayer.net.a2s.message.KeyResponseNumMessageI;
 import org.dclayer.net.a2s.rev0.message.AddressPublicKeyMessage;
 import org.dclayer.net.a2s.rev0.message.ApplicationChannelAcceptMessage;
 import org.dclayer.net.a2s.rev0.message.ApplicationChannelConnectedMessage;
@@ -22,6 +21,8 @@ import org.dclayer.net.a2s.rev0.message.JoinNetworkMessage;
 import org.dclayer.net.a2s.rev0.message.KeyCryptoResponseDataMessage;
 import org.dclayer.net.a2s.rev0.message.KeyDecryptDataMessage;
 import org.dclayer.net.a2s.rev0.message.KeyEncryptDataMessage;
+import org.dclayer.net.a2s.rev0.message.KeyMaxEncryptionBlockNumBytesRequestMessage;
+import org.dclayer.net.a2s.rev0.message.KeyResponseNumMessage;
 import org.dclayer.net.a2s.rev0.message.RevisionMessage;
 import org.dclayer.net.a2s.rev0.message.SlotAssignMessage;
 import org.dclayer.net.buf.ByteBuf;
@@ -46,6 +47,8 @@ public class Rev0Message extends A2SMessage {
 	public static final int APPLICATION_CHANNEL_ACCEPT = 12;
 	public static final int APPLICATION_CHANNEL_CONNECTED = 13;
 	public static final int APPLICATION_CHANNEL_DATA = 14;
+	public static final int KEY_MAX_ENCRYPTION_BLOCK_NUM_BYTES_REQUEST = 15;
+	public static final int KEY_RESPONSE_NUM = 16;
 
 	private A2SRevisionSpecificMessage message;
 	
@@ -64,7 +67,8 @@ public class Rev0Message extends A2SMessage {
 		new ApplicationChannelIncomingRequestMessage(),
 		new ApplicationChannelAcceptMessage(),
 		new ApplicationChannelConnectedMessage(),
-		new ApplicationChannelDataMessage()
+		new ApplicationChannelDataMessage(),
+		new KeyMaxEncryptionBlockNumBytesRequestMessage()
 	};
 
 	@Override
@@ -181,13 +185,23 @@ public class Rev0Message extends A2SMessage {
 	}
 
 	@Override
-	public ApplicationChannelConnectedMessageI setApplicationChannelConnectedMessage() {
+	public ApplicationChannelConnectedMessage setApplicationChannelConnectedMessage() {
 		return (ApplicationChannelConnectedMessage)(this.message = messages[APPLICATION_CHANNEL_CONNECTED]);
 	}
 	
 	@Override
-	public ApplicationChannelDataMessageI setApplicationChannelDataMessage() {
+	public ApplicationChannelDataMessage setApplicationChannelDataMessage() {
 		return (ApplicationChannelDataMessage)(this.message = messages[APPLICATION_CHANNEL_DATA]);
+	}
+	
+	@Override
+	public KeyMaxEncryptionBlockNumBytesRequestMessage setKeyMaxEncryptionBlockNumBytesRequestMessage() {
+		return (KeyMaxEncryptionBlockNumBytesRequestMessage)(this.message = messages[KEY_MAX_ENCRYPTION_BLOCK_NUM_BYTES_REQUEST]);
+	}
+
+	@Override
+	public KeyResponseNumMessageI setKeyResponseNumMessage() {
+		return (KeyResponseNumMessage)(this.message = messages[KEY_RESPONSE_NUM]);
 	}
 
 }

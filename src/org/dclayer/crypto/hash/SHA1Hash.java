@@ -18,12 +18,12 @@ public class SHA1Hash extends Hash {
 	}
 
 	@Override
-	public void update(Data data) {
+	protected void updateDigest(Data data) {
 		digest.update(data.getData(), data.offset(), data.length());
 	}
 
 	@Override
-	public void finish(Data outputData, int offset) {
+	protected void finishDigest(Data outputData, int offset) {
 		digest.doFinal(outputData.getData(), outputData.offset() + offset);
 	}
 

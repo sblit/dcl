@@ -218,6 +218,11 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 		send();
 	}
 	
+	private synchronized void sendKeyResponseNumMessage(int responseNum) {
+		sendMessage.setKeyResponseNumMessage().setResponseNum(responseNum);
+		send();
+	}
+	
 	private synchronized void sendApplicationChannelRequestMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, Key remotePublicKey) {
 		ApplicationChannelOutgoingRequestMessageI applicationChannelRequestMessage = sendMessage.setApplicationChannelOutgoingRequestMessage();
 		applicationChannelRequestMessage.setNetworkSlot(networkSlotId);
@@ -347,6 +352,16 @@ public class ApplicationInstance extends Thread implements A2SMessageReceiver {
 
 	@Override
 	public void onReceiveKeyCryptoResponseDataMessage(Data responseData) {
+		// TODO illegal
+	}
+	
+	@Override
+	public void onReceiveKeyMaxEncryptionBlockNumBytesRequestMessage() {
+		sendKeyResponseNumMessage(this.address.getKeyPair().getPrivateKey().getMaxEncryptionBlockNumBytes());
+	}
+	
+	@Override
+	public void onReceiveKeyResponseNumMessage(int maxEncryptionBlockNumBytes) {
 		// TODO illegal
 	}
 

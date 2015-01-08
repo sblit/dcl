@@ -8,6 +8,7 @@ import org.dclayer.net.address.Address;
 import org.dclayer.net.applicationchannel.ApplicationChannel;
 import org.dclayer.net.interservice.InterservicePolicy;
 import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.network.ApplicationNetworkInstance;
 import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.component.NetworkPayload;
 
@@ -20,9 +21,8 @@ public interface ApplicationConnectionActionListener extends NetworkInstanceList
 	
 	public Data getServiceIgnoreData();
 	
-	public InterservicePolicy makeDefaultIncomingApplicationChannelInterservicePolicy(NetworkInstance networkInstance, ApplicationChannel applicationChannel, LLA remoteLLA);
-	public InterservicePolicy makeDefaultOutgoingApplicationChannelInterservicePolicy(NetworkInstance networkInstance, ApplicationChannel applicationChannel, LLA remoteLLA);
-	
 	public void connect(LLA lla, InterservicePolicy interservicePolicy);
-	public void prepareForIncomingConnection(LLA lla, InterservicePolicy interservicePolicy, Data ignoreData);
+	public void prepareForIncomingApplicationChannel(LLA lla, ApplicationNetworkInstance applicationNetworkInstance, ApplicationChannel applicationChannel, Data ignoreData);
+	
+	public void initiateApplicationChannel(LLA lla, ApplicationNetworkInstance applicationNetworkInstance, ApplicationChannel applicationChannel);
 }

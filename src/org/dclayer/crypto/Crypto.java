@@ -23,7 +23,7 @@ public class Crypto {
 	public static final int RSA_ADDRESS_KEY_NUMBITS = 2048;
 	public static final int RSA_ADDRESS_KEY_CERTAINTY = 160;
 	
-	private static KeyPair generateRSAKeyPair(int numBits, int certainty) {
+	private static KeyPair<RSAKey> generateRSAKeyPair(int numBits, int certainty) {
 		
 		RSAKeyPairGenerator rsaKeyPairGenerator = new RSAKeyPairGenerator();
 		RSAKeyGenerationParameters rsaKeyGenerationParameters = new RSAKeyGenerationParameters(
@@ -52,11 +52,11 @@ public class Crypto {
 		
 	}
 	
-	public static KeyPair generateAPBRAddressRSAKeyPair() {
+	public static KeyPair<RSAKey> generateAPBRAddressRSAKeyPair() {
 		return generateAddressRSAKeyPair();
 	}
 	
-	public static KeyPair generateAddressRSAKeyPair() {
+	public static KeyPair<RSAKey> generateAddressRSAKeyPair() {
 		
 		return generateRSAKeyPair(RSA_ADDRESS_KEY_NUMBITS, RSA_ADDRESS_KEY_CERTAINTY);
 		

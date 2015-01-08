@@ -9,6 +9,7 @@ public class ApplicationConnectionRemoteRSAKeyInterface implements RemoteRSAKeyC
 	
 	private RemoteRSAKeyCommunicationInterface remoteRSAKeyCommunicationInterface;
 	private int numBits;
+	private int responseNum;
 	
 	private Data responseData = null;
 	
@@ -65,8 +66,32 @@ public class ApplicationConnectionRemoteRSAKeyInterface implements RemoteRSAKeyC
 	}
 
 	@Override
+	public int queryMaxEncryptionBlockNumBytes() {
+		
+		actionLock.lock();
+		
+		remoteRSAKeyCommunicationInterface.sendMaxEncryptionBlockNumBytesRequestMessage();
+		try {
+			synchronized(this) { wait(); }
+		} catch (InterruptedException e) {
+			return 0;
+		} finally {
+			actionLock.unlock();
+		}
+		
+		return responseNum;
+		
+	}
+
+	@Override
 	public synchronized void onResponseDataMessage(Data responseData) {
 		this.responseData = responseData;
+		notify();
+	}
+	
+	@Override
+	public synchronized void onResponseNumMessage(int responseNum) {
+		this.responseNum = responseNum;
 		notify();
 	}
 

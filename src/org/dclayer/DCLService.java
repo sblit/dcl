@@ -39,6 +39,7 @@ import org.dclayer.net.llacache.CachedLLA;
 import org.dclayer.net.llacache.LLA;
 import org.dclayer.net.llacache.LLACache;
 import org.dclayer.net.lladatabase.LLADatabase;
+import org.dclayer.net.network.ApplicationNetworkInstance;
 import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkInstanceCollection;
 import org.dclayer.net.network.NetworkNode;
@@ -289,27 +290,32 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 		return new InterservicePolicy();
 	}
 	
+	//
+	
 	@Override
-	public InterservicePolicy makeDefaultIncomingApplicationChannelInterservicePolicy(NetworkInstance networkInstance, ApplicationChannel applicationChannel, LLA remoteLLA) {
+	public InterservicePolicy addDefaultIncomingApplicationChannelInterservicePolicyRules(InterservicePolicy interservicePolicy, NetworkInstance networkInstance, ApplicationChannel applicationChannel, LLA remoteLLA) {
 		// TODO restrict
-		return new InterservicePolicy()
-				.allowIncomingApplicationChannel(applicationChannel);
+		return interservicePolicy.allowIncomingApplicationChannel(applicationChannel);
 	}
 	
 	@Override
-	public InterservicePolicy makeDefaultOutgoingApplicationChannelInterservicePolicy(NetworkInstance networkInstance, ApplicationChannel applicationChannel, LLA remoteLLA) {
-		return new InterservicePolicy()
-				.requestApplicationChannel(applicationChannel);
+	public InterservicePolicy addDefaultOutgoingApplicationChannelInterservicePolicyRules(InterservicePolicy interservicePolicy, ApplicationChannel applicationChannel) {
+		// TODO restrict
+		return interservicePolicy.requestApplicationChannel(applicationChannel);
 	}
 	
 	//
+	
+	public void connect(CachedLLA cachedLLA) {
+		connectionInitiationManager.connect(cachedLLA);
+	}
 	
 	@Override
 	public synchronized void connect(LLA lla, InterservicePolicy interservicePolicy) {
 		// TODO: do not connect if we're connected already
 		CachedLLA cachedLLA = getLLACache().getCachedLLA(lla, true);
 		cachedLLA.setInterservicePolicy(interservicePolicy);
-		connectionInitiationManager.connect(cachedLLA);
+		connect(cachedLLA);
 	}
 	
 	public void connect(LLA lla) {
@@ -320,10 +326,51 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	 * sends a packet to the given LLA in order to punch a hole in a local NAT
 	 */
 	@Override
-	public void prepareForIncomingConnection(LLA lla, InterservicePolicy interservicePolicy, Data punchData) {
+	public synchronized void prepareForIncomingApplicationChannel(LLA lla, ApplicationNetworkInstance applicationNetworkInstance, ApplicationChannel applicationChannel, Data punchData) {
+		
 		CachedLLA cachedLLA = getLLACache().getCachedLLA(lla, true);
-		cachedLLA.setInterservicePolicy(interservicePolicy);
-		connectionInitiationManager.punch(cachedLLA, punchData);
+		Log.debug(this, "preparing for incoming application channel from %s", cachedLLA);
+		
+		InterservicePolicy interservicePolicy = cachedLLA.getInterservicePolicy();
+		if(interservicePolicy == null) {
+			interservicePolicy = makeDefaultInterservicePolicy();
+			cachedLLA.setInterservicePolicy(interservicePolicy);
+		}
+		addDefaultIncomingApplicationChannelInterservicePolicyRules(interservicePolicy, applicationNetworkInstance, applicationChannel, lla);
+		
+		if(cachedLLA.disconnected()) {
+			connectionInitiationManager.punch(cachedLLA, punchData);
+		}
+		
+	}
+	
+	@Override
+	public synchronized void initiateApplicationChannel(LLA lla, ApplicationNetworkInstance applicationNetworkInstance, ApplicationChannel applicationChannel) {
+		
+		CachedLLA cachedLLA = getLLACache().getCachedLLA(lla, true);
+		Log.msg(this, "initiating application channel to %s", cachedLLA);
+		
+		InterserviceChannel interserviceChannel = cachedLLA.getInterserviceChannel();
+		if(interserviceChannel == null) {
+			
+			Log.debug(this, "adding interservice policy to cached lla for application channel initiation to %s, connecting", cachedLLA);
+			
+			InterservicePolicy interservicePolicy = cachedLLA.getInterservicePolicy();
+			if(interservicePolicy == null) {
+				interservicePolicy = makeDefaultInterservicePolicy();
+				cachedLLA.setInterservicePolicy(interservicePolicy);
+			}
+			addDefaultOutgoingApplicationChannelInterservicePolicyRules(interservicePolicy, applicationChannel);
+			
+			connect(cachedLLA);
+			
+		} else {
+
+			Log.debug(this, "notifying interservice channel to initiate application channel to %s", cachedLLA);
+			interserviceChannel.openApplicationChannel(applicationChannel);
+			
+		}
+		
 	}
 	
 	//
@@ -453,8 +500,8 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 				for(NetworkNode networkNode : networkInstanceCollection) {
 					interserviceChannel.joinNetwork(networkNode);
 				}
+				cachedLLA.setInterserviceChannel(interserviceChannel);
 			}
-			cachedLLA.setInterserviceChannel(interserviceChannel);
 			return interserviceChannel;
 		}
 		}

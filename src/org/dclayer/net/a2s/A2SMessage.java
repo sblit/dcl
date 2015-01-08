@@ -11,6 +11,8 @@ import org.dclayer.net.a2s.message.JoinDefaultNetworksMessageI;
 import org.dclayer.net.a2s.message.KeyCryptoResponseDataMessageI;
 import org.dclayer.net.a2s.message.KeyDecryptDataMessageI;
 import org.dclayer.net.a2s.message.KeyEncryptDataMessageI;
+import org.dclayer.net.a2s.message.KeyMaxEncryptionBlockNumBytesRequestMessageI;
+import org.dclayer.net.a2s.message.KeyResponseNumMessageI;
 import org.dclayer.net.a2s.message.RevisionMessageI;
 import org.dclayer.net.a2s.message.SlotAssignMessageI;
 
@@ -32,5 +34,7 @@ public abstract class A2SMessage extends A2SPacketComponent {
 	public abstract ApplicationChannelAcceptMessageI setApplicationChannelAcceptMessage();
 	public abstract ApplicationChannelConnectedMessageI setApplicationChannelConnectedMessage();
 	public abstract ApplicationChannelDataMessageI setApplicationChannelDataMessage();
+	public abstract KeyMaxEncryptionBlockNumBytesRequestMessageI setKeyMaxEncryptionBlockNumBytesRequestMessage();
+	public abstract KeyResponseNumMessageI setKeyResponseNumMessage();
 	
 }

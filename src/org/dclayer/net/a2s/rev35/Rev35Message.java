@@ -17,6 +17,8 @@ import org.dclayer.net.a2s.message.JoinDefaultNetworksMessageI;
 import org.dclayer.net.a2s.message.KeyCryptoResponseDataMessageI;
 import org.dclayer.net.a2s.message.KeyDecryptDataMessageI;
 import org.dclayer.net.a2s.message.KeyEncryptDataMessageI;
+import org.dclayer.net.a2s.message.KeyMaxEncryptionBlockNumBytesRequestMessageI;
+import org.dclayer.net.a2s.message.KeyResponseNumMessageI;
 import org.dclayer.net.a2s.rev0.Rev0Message;
 import org.dclayer.net.a2s.rev35.message.DataMessage;
 import org.dclayer.net.a2s.rev35.message.GenerateKeyMessage;
@@ -177,6 +179,18 @@ public class Rev35Message extends A2SMessage {
 
 	@Override
 	public ApplicationChannelDataMessageI setApplicationChannelDataMessage() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public KeyMaxEncryptionBlockNumBytesRequestMessageI setKeyMaxEncryptionBlockNumBytesRequestMessage() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	@Override
+	public KeyResponseNumMessageI setKeyResponseNumMessage() {
 		// TODO Auto-generated method stub
 		return null;
 	}

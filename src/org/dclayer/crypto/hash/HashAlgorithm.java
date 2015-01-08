@@ -28,9 +28,9 @@ public enum HashAlgorithm {
 	//
 	
 	private String identifier;
-	private int digestSize;
+	private int digestNumBytes;
 	
-	private HashAlgorithm(String identifier, int digestSize) {
+	private HashAlgorithm(String identifier, int digestNumBytes) {
 		this.identifier = identifier;
 	}
 	
@@ -38,8 +38,8 @@ public enum HashAlgorithm {
 		return identifier;
 	}
 	
-	public int getDigestSize() {
-		return digestSize;
+	public int getDigestNumBytes() {
+		return digestNumBytes;
 	}
 	
 	public abstract Hash getInstance();

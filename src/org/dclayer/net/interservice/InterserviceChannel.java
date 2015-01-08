@@ -236,6 +236,27 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		return ready;
 	}
 	
+	public synchronized void openApplicationChannel(ApplicationChannel applicationChannel) {
+		
+		Log.msg(this, "opening application channel %s", applicationChannel);
+		
+		AddressSlot localAddressSlot = localAddressSlotMap.find(applicationChannel.getLocalAddress());
+		AddressSlot remoteAddressSlot = remoteAddressSlotMap.find(applicationChannel.getRemoteAddress());
+		
+		if(localAddressSlot != null && remoteAddressSlot != null && localAddressSlot.getConnectionBase() >= CONNECTIONBASE_TRUSTED && remoteAddressSlot.getConnectionBase() >= CONNECTIONBASE_TRUSTED) {
+			
+			Log.msg(this, "both local and remote address slots exist and are on trusted connection base, requesting application channel immediately");
+			requestApplicationChannel(localAddressSlot, remoteAddressSlot, applicationChannel);
+			
+		} else {
+			
+			Log.msg(this, "local and remote address slots not both ready, adding application channel to interservice policy");
+			interserviceChannelActionListener.addDefaultOutgoingApplicationChannelInterservicePolicyRules(interservicePolicy, applicationChannel);
+			
+		}
+		
+	}
+	
 	/**
 	 * called when the remote notifies us of its incoming connection base
 	 * @param connectionBase the incoming connection base of the remote
@@ -340,7 +361,7 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 	
 	private synchronized void acceptIncomingApplicationChannelRequest(ApplicationChannel applicationChannel, AddressSlot localAddressSlot, AddressSlot remoteAddressSlot, int remoteApplicationChannelSlotId) {
 		
-		Log.debug(this, "accepting request for application channel: %s", applicationChannel);
+		Log.msg(this, "accepting request for application channel: %s", applicationChannel);
 		
 		ApplicationChannelSlot remoteApplicationChannelSlot = remoteApplicationChannelSlotMap.put(remoteApplicationChannelSlotId, applicationChannel);
 		ApplicationChannelSlot localApplicationChannelSlot = localApplicationChannelSlotMap.add(applicationChannel);
@@ -686,9 +707,10 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		addressSlot = remoteAddressSlotMap.put(addressSlotId, remoteAddress);
 		
 		CryptoChallenge trustedSwitchOutCryptoChallenge = new Fixed128ByteCryptoChallenge(key);
-		addressSlot.setTrustedSwitchOutCryptoChallenge(trustedSwitchOutCryptoChallenge);
+
+		Data plainData = trustedSwitchOutCryptoChallenge.makeChallengeData();
 		
-		Data plainData = trustedSwitchOutCryptoChallenge.makeRandomPlainData();
+		addressSlot.setTrustedSwitchOutCryptoChallenge(trustedSwitchOutCryptoChallenge);
 		sendCryptoChallengeRequest(addressSlot, plainData);
 		
 	}
@@ -718,7 +740,7 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		
 		Data cipherData;
 		try {
-			cipherData = inCryptoChallenge.solveCryptoChallenge(plainData);
+			cipherData = inCryptoChallenge.solveChallengeData(plainData);
 		} catch (CryptoException e) {
 			Log.exception(this, e, "could not solve crypto challenge for address slot: %s", addressSlot);
 			cancelTrustedSwitch(addressSlot);
@@ -753,7 +775,7 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		
 		boolean success;
 		try {
-			success = trustedSwitchOutCryptoChallenge.verifyCipherData(cipherData);
+			success = trustedSwitchOutCryptoChallenge.verifySolvedData(cipherData);
 		} catch (CryptoException e) {
 			Log.exception(this, e, "could not verify crypto challenge reply for address slot: %s", addressSlot);
 			// TODO notify remote of failure

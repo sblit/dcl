@@ -259,9 +259,8 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 			
 			if(response) {
 				
-				Log.msg(this, "initiating connection to %s", senderLLA);
-				InterservicePolicy interservicePolicy = applicationConnectionActionListener.makeDefaultOutgoingApplicationChannelInterservicePolicy(applicationNetworkInstance, applicationChannelSlot.getApplicationChannel(), senderLLA);
-				applicationConnectionActionListener.connect(senderLLA, interservicePolicy);
+				Log.msg(this, "initiating application channel to %s", senderLLA);
+				applicationConnectionActionListener.initiateApplicationChannel(senderLLA, applicationNetworkInstance, applicationChannelSlot.getApplicationChannel());
 				
 			} else {
 				
@@ -287,8 +286,7 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		Address remoteAddress = applicationChannel.getApplicationChannelTarget().getRemoteAddress();
 		String actionIdentifier = applicationChannel.getApplicationChannelTarget().getActionIdentifier();
 		
-		InterservicePolicy interservicePolicy = applicationConnectionActionListener.makeDefaultIncomingApplicationChannelInterservicePolicy(applicationNetworkInstance, applicationChannel, senderLLA);
-		applicationConnectionActionListener.prepareForIncomingConnection(senderLLA, interservicePolicy, ignoreData);
+		applicationConnectionActionListener.prepareForIncomingApplicationChannel(senderLLA, applicationNetworkInstance, applicationChannel, ignoreData);
 		
 		sendNeighborRequest(applicationNetworkInstance, remoteAddress, DCL.ACTION_IDENTIFIER_APPLICATION_CHANNEL_PREFIX + actionIdentifier, true);
 		
@@ -438,6 +436,8 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 				neighborRequestCrispMessage.getIgnoreDataComponent().setData(applicationConnectionActionListener.getServiceIgnoreData());
 			}
 			
+			Log.debug(this, "sending neighbor request crisp packet: %s", crispPacket.represent(true));
+			
 			try {
 				networkPayload.setPayloadData(crispPacket);
 				networkPacket.getDataComponent().setData(networkPayload);
@@ -445,8 +445,7 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 				Log.exception(this, e, "could not write network packet payload");
 				return;
 			}
-
-			Log.debug(this, "sending neighbor request crisp packet: %s", neighborRequestCrispMessage.represent(true));
+			
 			Log.debug(this, "sending neighbor request network packet: %s", networkPacket.represent(true));
 			
 			applicationNetworkInstance.forward(networkPacket);
@@ -486,6 +485,11 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	
 	private synchronized void sendKeyDecryptMessage(Data cipherData) {
 		sendMessage.setKeyDecryptDataMessage().getCipherDataComponent().setData(cipherData);
+		send();
+	}
+	
+	private synchronized void sendKeyMaxEncryptionBlockNumBytesRequestMessage() {
+		sendMessage.setKeyMaxEncryptionBlockNumBytesRequestMessage();
 		send();
 	}
 	
@@ -585,10 +589,10 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 			// lets confirm this right away
 			final CryptoChallenge challengingCryptoChallenge = new Fixed128ByteCryptoChallenge(publicKey);
 			final CryptoChallenge solvingCryptoChallenge = new Fixed128ByteCryptoChallenge(privateKey);
-			final Data plainData = challengingCryptoChallenge.makeRandomPlainData();
+			final Data plainData = challengingCryptoChallenge.makeChallengeData();
 			
-			Data cipherData = solvingCryptoChallenge.solveCryptoChallenge(plainData);
-			if(!challengingCryptoChallenge.verifyCipherData(cipherData)) {
+			Data cipherData = solvingCryptoChallenge.solveChallengeData(plainData);
+			if(!challengingCryptoChallenge.verifySolvedData(cipherData)) {
 				Log.warning(ApplicationConnection.this, "the application could not pass the crypto challenge for the public key it provided");
 				// TODO react
 			} else {
@@ -627,6 +631,16 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	public void onReceiveKeyCryptoResponseDataMessage(Data responseData) {
 		Log.debug(this, "received key crypto response data: %s", responseData);
 		if(this.remoteRSAKeyCommunicationListener != null) this.remoteRSAKeyCommunicationListener.onResponseDataMessage(responseData);
+	}
+	
+	@Override
+	public void onReceiveKeyMaxEncryptionBlockNumBytesRequestMessage() {
+		// TODO illegal
+	}
+	
+	@Override
+	public void onReceiveKeyResponseNumMessage(int responseNum) {
+		if(this.remoteRSAKeyCommunicationListener != null) this.remoteRSAKeyCommunicationListener.onResponseNumMessage(responseNum);
 	}
 	
 	@Override
@@ -740,6 +754,12 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 	public void sendDecryptMessage(Data cipherData) {
 		Log.debug(this, "sending key decrypt data message for cipher data: %s", cipherData);
 		sendKeyDecryptMessage(cipherData);
+	}
+	
+	@Override
+	public void sendMaxEncryptionBlockNumBytesRequestMessage() {
+		Log.debug(this, "sending key max encryption block num bytes request message");
+		sendKeyMaxEncryptionBlockNumBytesRequestMessage();
 	}
 	
 	//

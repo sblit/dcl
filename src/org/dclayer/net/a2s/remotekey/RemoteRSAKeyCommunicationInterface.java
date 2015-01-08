@@ -8,5 +8,6 @@ public interface RemoteRSAKeyCommunicationInterface {
 	
 	public void sendEncryptMessage(Data plainData);
 	public void sendDecryptMessage(Data cipherData);
+	public void sendMaxEncryptionBlockNumBytesRequestMessage();
 	
 }

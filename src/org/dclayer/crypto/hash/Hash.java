@@ -14,28 +14,40 @@ public abstract class Hash {
 		this.hashAlgorithm = hashAlgorithm;
 	}
 	
-	public HashAlgorithm getHashAlgorithm() {
+	public final HashAlgorithm getHashAlgorithm() {
 		return hashAlgorithm;
 	}
 	
-	public void update(Data... datas) {
+	public final Hash update(Data... datas) {
 		for(Data data : datas) {
 			update(data);
 		}
+		return this;
 	}
 	
-	public Data finish() {
+	public final Hash update(Data data) {
+		updateDigest(data);
+		return this;
+	}
+	
+	public final Data finish() {
 		Data outputData = new Data(getDigestSize());
 		finish(outputData);
 		return outputData;
 	}
 	
-	public void finish(Data outputData) {
+	public final Data finish(Data outputData) {
 		finish(outputData, 0);
+		return outputData;
 	}
 	
-	public abstract int getDigestSize();
-	public abstract void update(Data data);
-	public abstract void finish(Data outputData, int offset);
+	public final Data finish(Data outputData, int offset) {
+		finishDigest(outputData, offset);
+		return outputData;
+	}
+	
+	protected abstract int getDigestSize();
+	protected abstract void updateDigest(Data data);
+	protected abstract void finishDigest(Data outputData, int offset);
 	
 }

@@ -23,5 +23,7 @@ public interface A2SMessageReceiver {
 	public void onReceiveApplicationChannelAcceptMessage(int networkSlotId, int channelSlotId, String actionIdentifierSuffix, AbsKeyComponent keyComponent, LLA senderLLA, Data ignoreData);
 	public void onReceiveApplicationChannelConnectMessage(int channelSlotId);
 	public void onReceiveApplicationChannelDataMessage(int channelSlotId, Data data);
+	public void onReceiveKeyMaxEncryptionBlockNumBytesRequestMessage();
+	public void onReceiveKeyResponseNumMessage(int maxEncryptionBlockNumBytes);
 	
 }

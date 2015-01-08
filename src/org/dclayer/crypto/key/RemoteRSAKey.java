@@ -7,6 +7,8 @@ import org.dclayer.net.Data;
 public class RemoteRSAKey extends Key {
 	
 	private RemoteRSAKeyInterface remoteRSAKeyInterface;
+	
+	private int maxEncryptionBlockNumBytes = -1;
 
 	public RemoteRSAKey(RemoteRSAKeyInterface remoteRSAKeyInterface) throws InsufficientKeySizeException {
 		super(remoteRSAKeyInterface.getNumBits());
@@ -21,6 +23,14 @@ public class RemoteRSAKey extends Key {
 	@Override
 	public int getMaxBlockNumBits() {
 		return getNumBits();
+	}
+	
+	@Override
+	public int getMaxEncryptionBlockNumBytes() {
+		if(maxEncryptionBlockNumBytes < 0) {
+			maxEncryptionBlockNumBytes = remoteRSAKeyInterface.queryMaxEncryptionBlockNumBytes();
+		}
+		return maxEncryptionBlockNumBytes;
 	}
 
 	@Override

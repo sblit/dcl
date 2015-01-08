@@ -57,7 +57,7 @@ public class CircleNetworkType extends NetworkType<CircleNetworkType> {
 	public Data scaleAddress(Address address) {
 		
 		Data fullData = address.toData();
-		if(byteLength == hashAlgorithm.getDigestSize()) return fullData;
+		if(byteLength == hashAlgorithm.getDigestNumBytes()) return fullData;
 		
 		Data scaledData = new Data(byteLength);
 		

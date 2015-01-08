@@ -30,6 +30,7 @@ public abstract class Key {
 	public abstract Data decrypt(Data cipherData) throws CryptoException;
 	
 	public abstract int getBlockNumBytes();
+	public abstract int getMaxEncryptionBlockNumBytes();
 	
 	public abstract Data toData();
 	

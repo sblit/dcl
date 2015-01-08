@@ -5,7 +5,7 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.component.DataComponent;
-import org.dclayer.net.component.KeyEncryptedPacketComponent;
+import org.dclayer.net.component.EncryptionKeySignedPacketComponent;
 import org.dclayer.net.componentinterface.DataComponentI;
 import org.dclayer.net.crisp.CrispMessage;
 import org.dclayer.net.crisp.CrispMessageReceiver;
@@ -13,7 +13,7 @@ import org.dclayer.net.crisp.CrispPacket;
 import org.dclayer.net.crisp.message.NeighborRequestCrispMessageI;
 import org.dclayer.net.llacache.LLA;
 
-public class NeighborRequestCrispMessage extends KeyEncryptedPacketComponent implements NeighborRequestCrispMessageI, CrispMessage {
+public class NeighborRequestCrispMessage extends EncryptionKeySignedPacketComponent implements NeighborRequestCrispMessageI, CrispMessage {
 	
 	private String actionIdentifier;
 	private LLA senderLLA = null;

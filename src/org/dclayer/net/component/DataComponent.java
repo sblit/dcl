@@ -34,10 +34,14 @@ public class DataComponent extends PacketComponent implements DataComponentI {
 		this.dataLength = new FlexNum();
 	}
 	
-	private void verifyLength() {
-		int curLength = data == null ? 0 : data.length();
+	private void verifyLength(int curLength) {
 		if(this.dataLength.getNum() == curLength) return;
 		this.dataLength.setNum(curLength);
+	}
+	
+	private void verifyLength() {
+		int curLength = data == null ? 0 : data.length();
+		verifyLength(curLength);
 	}
     
     /**
@@ -108,6 +112,12 @@ public class DataComponent extends PacketComponent implements DataComponentI {
 	public int length() {
 		verifyLength();
 		return dataLength.length() + (int) dataLength.getNum();
+	}
+
+	@Override
+	public int lengthForDataLength(int dataLength) {
+		verifyLength(dataLength);
+		return this.dataLength.length() + (int) this.dataLength.getNum();
 	}
 
 	@Override
