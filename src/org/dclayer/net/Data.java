@@ -56,7 +56,7 @@ public class Data {
 	 * @param length the amount of bytes the space in this {@link Data} needs to be adapted to
 	 */
 	public void prepare(int length) {
-		if(length > this.length) {
+		if(data == null || length > this.length) {
 			reset(new byte[length], 0, length);
 		} else {
 			reset(0, length);

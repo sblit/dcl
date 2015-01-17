@@ -32,6 +32,7 @@ public enum HashAlgorithm {
 	
 	private HashAlgorithm(String identifier, int digestNumBytes) {
 		this.identifier = identifier;
+		this.digestNumBytes = digestNumBytes;
 	}
 	
 	public String getIdentifier() {

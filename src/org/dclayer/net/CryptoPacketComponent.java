@@ -44,6 +44,18 @@ public abstract class CryptoPacketComponent extends PacketComponent implements C
 		return publicKey;
 	}
 	
+	protected PacketComponentI makePlainPacketComponent() {
+		return new PacketComponentI() {
+			@Override public void write(ByteBuf byteBuf) throws BufException { writePlain(byteBuf); }
+			@Override public String represent(boolean tree, int level) { return null; }
+			@Override public String represent(boolean tree) { return null; }
+			@Override public String represent() { return null; }
+			@Override public void read(ByteBuf byteBuf) throws ParseException, BufException { readPlain(byteBuf); }
+			@Override public int length() { return plainLength(); }
+			@Override public PacketComponentI[] getChildren() { return getPlainChildren(); }
+		};
+	}
+	
 	protected abstract void readPlain(ByteBuf byteBuf) throws ParseException, BufException;
 	protected abstract void writePlain(ByteBuf byteBuf) throws BufException;
 	protected abstract int plainLength();

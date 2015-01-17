@@ -29,6 +29,11 @@ public class DataComponent extends PacketComponent implements DataComponentI {
 	public int length() {
 		return 2 + data.length() + 1;
 	}
+	
+	@Override
+	public int lengthForDataLength(int dataLength) {
+		return 2 + dataLength + 1;
+	}
 
 	@Override
 	public String toString() {

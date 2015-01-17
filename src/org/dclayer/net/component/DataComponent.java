@@ -130,4 +130,5 @@ public class DataComponent extends PacketComponent implements DataComponentI {
 	public PacketComponent[] getChildren() {
 		return null;
 	}
+	
 }
