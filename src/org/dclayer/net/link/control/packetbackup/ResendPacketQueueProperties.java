@@ -69,6 +69,7 @@ public class ResendPacketQueueProperties extends Properties {
 		this.delayFactor = delayFactor;
 		this.maxAttempts = maxAttempts;
 		this.resendPacketQueue = resendPacketQueue;
+		System.out.println(String.format("PacketBackup(%s).setResend()", this.getPacketBackup()));
 	}
 	
 	/**
@@ -89,11 +90,13 @@ public class ResendPacketQueueProperties extends Properties {
 	public boolean resend(Channel channel) {
 		resentCount++;
 		nextResendTime += (delay * Math.pow(delayFactor, resentCount));
-		Log.debug(channel, "PacketBackup.resend(): %s: resentCount=%d, nextResendTime=%d (added %f), returning %s", this.getPacketBackup(), resentCount, nextResendTime, (delay * Math.pow(delayFactor, resentCount)), resentCount <= maxAttempts);
-		return maxAttempts <= 0 || resentCount <= maxAttempts;
+		boolean resend = maxAttempts <= 0 || resentCount <= maxAttempts;
+		Log.debug(channel, "PacketBackup.resend(): %s: resentCount=%d, nextResendTime=%d (added %f), returning %s", this.getPacketBackup(), resentCount, nextResendTime, (delay * Math.pow(delayFactor, resentCount)), resend);
+		return resend;
 	}
 	
 	public void onUsedChange(boolean used) {
+		System.out.println(String.format("PacketBackup(%s).onUsedChange(used=%s)", this.getPacketBackup(), used));
 		if(used == false && resendPacketQueue != null) {
 			resendPacketQueue.remove(getPacketBackup());
 			resendPacketQueue = null;
@@ -101,10 +104,12 @@ public class ResendPacketQueueProperties extends Properties {
 	}
 	
 	public void removeFromResendPacketQueueOnUnUsed(ResendPacketQueue resendPacketQueue) {
+		System.out.println(String.format("PacketBackup(%s).removeFromResendPacketQueueOnUnUsed(resendPacketQueue=%s)", this.getPacketBackup(), resendPacketQueue));
 		this.resendPacketQueue = resendPacketQueue;
 	}
 	
 	public void onSent() {
+		System.out.println(String.format("PacketBackup(%s).onSent(): resendPacketQueue=%s", this.getPacketBackup(), resendPacketQueue));
 		if(resendPacketQueue != null) {
 			resendPacketQueue.queue(getPacketBackup());
 		}

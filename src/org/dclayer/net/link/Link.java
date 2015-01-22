@@ -34,7 +34,13 @@ public class Link<T> implements HierarchicalLevel {
 		ConnectingPassiveEchoRequested,
 		ConnectingActiveEchoReplied,
 		ConnectingPassiveFullEncryptionRequested,
-		Connected;
+		Connected,
+		Disconnected;
+	}
+	
+	public static enum CloseReason {
+		Disconnect,
+		Timeout
 	}
 	
 	@Override
@@ -620,4 +626,14 @@ public class Link<T> implements HierarchicalLevel {
 	public ApplicationDataChannel getChannel(String channelName) {
 		return applicationChannelMap.get(channelName);
 	}
+	
+	public void kill(CloseReason closeReason) {
+		synchronized(channelCollection) {
+			for(Channel channel : channelCollection.getChannels()) {
+				channel.onClose();
+			}
+		}
+		setStatus(Status.Disconnected);
+	}
+	
 }

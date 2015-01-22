@@ -97,13 +97,14 @@ public class BMCPManagementChannel extends ManagementChannel {
 				try {
 					Thread.sleep(3000);
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+					Log.exception(BMCPManagementChannel.this, e, "exception in BlockStatusThread");
 				}
 				Log.debug(BMCPManagementChannel.this, "BlockStatusThread: ChannelCollection: %s", getLink().getChannelCollection().represent(true));
-				Log.debug(BMCPManagementChannel.this, "BlockStatusThread: PacketBackupCollection status: %s", getSentPacketBackupCollection());
 				if(getLink().getStatus() == Link.Status.Connected && channelBlockStatusRequestDataId == -1) {
 					requestChannelBlockStatus();
+				} else if(getLink().getStatus() == Link.Status.Disconnected) {
+					Log.debug(BMCPManagementChannel.this, "BlockStatusThread: exiting");
+					return;
 				}
 			}
 		}
@@ -1059,6 +1060,18 @@ public class BMCPManagementChannel extends ManagementChannel {
 		sendUnreliable(outBMCPChannelDataComponent);
 		
 		sendLock.unlock();
+		
+	}
+
+	@Override
+	public void onTimeout() {
+		// TODO Auto-generated method stub
+		
+	}
+
+	@Override
+	public void onClose() {
+		// TODO Auto-generated method stub
 		
 	}
 	

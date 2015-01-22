@@ -35,15 +35,15 @@ public class Log {
 		// if the end of a log message's path matches one of the arrays below reversed, the message is printed only if
 		// the log level of the message is equal to or higher than the level specified here
 		
-//		new IgnoreEntry(Level.DEBUG, InterserviceChannel.class), // show all log messages from InterserviceChannel instances only
-		new IgnoreEntry(Level.WARNING, UDPSocket.class),
-		new IgnoreEntry(Level.WARNING, FlowControl.class),
-		new IgnoreEntry(Level.WARNING, ResendPacketQueue.class),
-		new IgnoreEntry(Level.WARNING, PacketBackupCollection.class),
-		new IgnoreEntry(Level.WARNING, DiscontinuousBlockCollection.class),
-		new IgnoreEntry(Level.MSG, Slot.class),
-		new IgnoreEntry(Level.MSG, Channel.class),
-		new IgnoreEntry(Level.MSG, Link.class),
+////		new IgnoreEntry(Level.DEBUG, InterserviceChannel.class), // show all log messages from InterserviceChannel instances only
+//		new IgnoreEntry(Level.WARNING, UDPSocket.class),
+//		new IgnoreEntry(Level.WARNING, FlowControl.class),
+//		new IgnoreEntry(Level.WARNING, ResendPacketQueue.class),
+//		new IgnoreEntry(Level.WARNING, PacketBackupCollection.class),
+//		new IgnoreEntry(Level.WARNING, DiscontinuousBlockCollection.class),
+//		new IgnoreEntry(Level.MSG, Slot.class),
+//		new IgnoreEntry(Level.MSG, Channel.class),
+//		new IgnoreEntry(Level.MSG, Link.class),
 	};
 	
 	public static String PART_MAIN = "main",

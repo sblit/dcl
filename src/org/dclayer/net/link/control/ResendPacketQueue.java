@@ -27,6 +27,8 @@ public class ResendPacketQueue implements HierarchicalLevel {
 	 */
 	private ResendPacketQueueProperties lastProperties = null;
 	
+	private long lastInvalidPacketBackup = 0;
+	
 	public ResendPacketQueue(Channel channel) {
 		this.channel = channel;
 	}
@@ -48,6 +50,8 @@ public class ResendPacketQueue implements HierarchicalLevel {
 	 */
 	// called by Link upon sending a packet
 	public synchronized void queue(PacketBackup packetBackup) {
+		
+		Log.debug(this, "queuing: %s", packetBackup);
 		
 		ResendPacketQueueProperties properties = packetBackup.getResendPacketQueueProperties();
 		properties.removeFromResendPacketQueueOnUnUsed(this);
@@ -180,8 +184,14 @@ public class ResendPacketQueue implements HierarchicalLevel {
 				Log.debug(this, "PacketBackup we waited for is no longer present");
 			}
 			
+			lastInvalidPacketBackup = now;
+			
 		}
 		
+	}
+	
+	public boolean timeout() {
+		return lastInvalidPacketBackup != 0 && ((System.nanoTime()/1000000L) - lastInvalidPacketBackup) > 5000;
 	}
 	
 }

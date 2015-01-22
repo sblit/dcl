@@ -125,14 +125,14 @@ public abstract class ManagementChannel extends Channel {
 				PacketBackup packetBackup = resendPacketQueue.waitAndPopNext();
 				boolean resend = packetBackup.getResendPacketQueueProperties().resend(ManagementChannel.this);
 				Log.debug(ManagementChannel.this, "%s, resend=%s", packetBackup, resend);
-				if(resend) {
+				if(!resend && resendPacketQueue.timeout()) {
+					// timeout
+					timeout();
+					return;
+				} else {
 					// resend this packet
 					resend(packetBackup);
 					resendPacketQueue.queue(packetBackup); // requeue the packet
-				} else {
-					// declare this packet as failed to send
-					// TODO
-					Log.warning(ManagementChannel.this, "FAILED TO TRANSMIT PACKET %s", packetBackup);
 				}
 			}
 		}
@@ -159,7 +159,7 @@ public abstract class ManagementChannel extends Channel {
 	
 	@Override
 	public PacketBackupCollection getSentPacketBackupCollection() {
-		return null;
+		return sentPacketBackupCollection;
 	}
 	
 	@Override
@@ -394,13 +394,13 @@ public abstract class ManagementChannel extends Channel {
 		
 		sendLock.unlock();
 		
-		getLink().send(packetBackup);
-		
 		if(discontinuousBlock == null) {
-			packetBackup.getResendPacketQueueProperties().setResend(System.nanoTime()/1000000L, 1000, 1.0, 0, resendPacketQueue);
+			packetBackup.getResendPacketQueueProperties().setResend(System.nanoTime()/1000000L, 1000, 1.0, 8, resendPacketQueue);
 		} else {
 			discontinuousBlock.setReplyPacketBackup(packetBackup);
 		}
+		
+		getLink().send(packetBackup);
 		
 		return dataId;
 		
@@ -477,6 +477,11 @@ public abstract class ManagementChannel extends Channel {
 		sentPacketBackupCollection.tryClear(dataId);
 	}
 	
+	private void timeout() {
+		onTimeout();
+		getLink().kill(Link.CloseReason.Timeout);
+	}
+	
 	@Override
 	public final void onOpen(boolean initiator) {
 		resendThread.start();
@@ -509,5 +514,7 @@ public abstract class ManagementChannel extends Channel {
 	 * called every time a packet is received and a gap exists
 	 */
 	public abstract void onGapReceive();
+	
+	public abstract void onTimeout();
 	
 }

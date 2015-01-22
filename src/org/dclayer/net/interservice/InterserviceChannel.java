@@ -970,5 +970,12 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		sendApplicationChannelDataInterserviceMessage(applicationChannelSlot, data);
 		
 	}
+
+	@Override
+	public void onClose() {
+		
+		Log.msg(this, "channel closed");
+		
+	}
 	
 }

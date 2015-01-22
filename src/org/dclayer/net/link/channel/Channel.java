@@ -5,6 +5,7 @@ import org.dclayer.meta.Log;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.buf.TransparentByteBuf;
 import org.dclayer.net.link.Link;
+import org.dclayer.net.link.Link.CloseReason;
 import org.dclayer.net.link.control.FlowControl;
 import org.dclayer.net.link.control.idcollection.IdCollection;
 import org.dclayer.net.link.control.packetbackup.FlowControlProperties;
@@ -103,6 +104,10 @@ public abstract class Channel implements HierarchicalLevel {
 	 * @param initiator true if we requested this channel, false if the remote requested it
 	 */
 	protected abstract void onOpen(boolean initiator);
+	/**
+	 * called when this channel is closed
+	 */
+	public abstract void onClose();
 	/**
 	 * called upon receipt of a link packet destined on this channel
 	 * @param dataId the data id of the link packet
