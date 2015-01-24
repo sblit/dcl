@@ -10,6 +10,7 @@ public interface InterserviceChannelActionListener {
 	public void onReadyChange(InterserviceChannel interserviceChannel, boolean ready);
 	public void onNewRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode networkNode, NetworkSlot localNetworkSlot);
 	public void onRemoveRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode networkNode);
+	public void onInterserviceChannelClosed(InterserviceChannel interserviceChannel);
 	
 	public InterservicePolicy addDefaultIncomingApplicationChannelInterservicePolicyRules(InterservicePolicy interservicePolicy, NetworkInstance networkInstance, ApplicationChannel applicationChannel, LLA remoteLLA);
 	public InterservicePolicy addDefaultOutgoingApplicationChannelInterservicePolicyRules(InterservicePolicy interservicePolicy, ApplicationChannel applicationChannel);

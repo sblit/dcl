@@ -60,6 +60,14 @@ public abstract class BMCPCommandComponent extends PacketComponent {
 	 * BMCP command type of the acknowledgement command
 	 */
 	public static final byte ACK = 12;
+	/**
+	 * BMCP command type of the disconnect command
+	 */
+	public static final byte DISCONNECT = 13;
+	/**
+	 * BMCP command type of the kill link command
+	 */
+	public static final byte KILL_LINK = 14;
 	
 	/**
 	 * @return the type of this BMCP command

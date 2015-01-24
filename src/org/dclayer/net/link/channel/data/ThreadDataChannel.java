@@ -28,12 +28,22 @@ public abstract class ThreadDataChannel extends DataChannel implements Runnable 
 		readConstantly(getReadByteBuf());
 	}
 	
+	@Override
+	public final void onClose() {
+		endReadByteBuf();
+		onCloseChannel();
+	}
+	
 	/**
 	 * called when this channel is actually opened (either requested by the
 	 * remote and accepted or requested locally and confirmed by the remote)
 	 * @param initiator true if we requested this channel, false if the remote requested it
 	 */
 	protected abstract void onOpenChannel(boolean initiator);
+	/**
+	 * called when this channel is closed
+	 */
+	protected abstract void onCloseChannel();
 	/**
 	 * called by this {@link DataChannel}'s Thread {@link DataChannel#thread}.<br />
 	 * only return from this method if this channel should be closed.

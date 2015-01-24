@@ -1,5 +1,6 @@
 package org.dclayer.net.buf;
 import org.dclayer.exception.net.buf.BufException;
+import org.dclayer.exception.net.buf.EndOfBufException;
 import org.dclayer.net.buf.ByteBuf;
 
 /**
@@ -32,6 +33,8 @@ public class AsyncPipeByteBuf extends ByteBuf {
 	 */
 	private volatile boolean waiting = false;
 	
+	private volatile boolean end = false;
+	
 	/**
 	 * creates a new {@link AsyncPipeByteBuf} with a new buffer of the given initial size
 	 * @param bufferSize the initial size for the new buffer
@@ -44,16 +47,17 @@ public class AsyncPipeByteBuf extends ByteBuf {
 	 * reads a byte. if buf is empty, this will block until one is available.
 	 * @return a byte from buf
 	 */
-	private byte readByte() {
+	private byte readByte() throws EndOfBufException {
 		if(read == write && !full) {
 			// buffer is empty, wait
 			waiting = true;
 			try {
 				this.wait();
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+			} catch (InterruptedException e) {}
 			waiting = false;
+		}
+		if(end) {
+			throw new EndOfBufException();
 		}
 		byte b = buf[read];
 		read = (read + 1) % buf.length;
@@ -115,6 +119,13 @@ public class AsyncPipeByteBuf extends ByteBuf {
 	public synchronized void write(ByteBuf byteBuf, int length) throws BufException {
 		for(int i = 0; i < length; i++) {
 			write(byteBuf.read());
+		}
+	}
+	
+	public synchronized void end() {
+		end = true;
+		if(waiting) {
+			this.notify();
 		}
 	}
 

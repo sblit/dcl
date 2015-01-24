@@ -223,8 +223,28 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	}
 	
 	@Override
-	public void onRemoveRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode networkNode) {
-		// TODO remove route for that network and the remote's address
+	public void onRemoveRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode remoteNetworkNode) {
+		
+		NetworkInstance localNetworkInstance = networkInstanceCollection.findLocal(remoteNetworkNode.getNetworkType());
+		
+		if(localNetworkInstance != null) {
+			
+			RoutingTable routingTable = localNetworkInstance.getRoutingTable();
+			boolean removed = routingTable.remove(remoteNetworkNode);
+			
+			if(removed) {
+				
+				Log.debug(this, "removed %s from routing table for %s", remoteNetworkNode, localNetworkInstance);
+				
+			}
+			
+		}
+		
+	}
+	
+	@Override
+	public void onInterserviceChannelClosed(InterserviceChannel interserviceChannel) {
+		// TODO take action
 	}
 	
 	@Override

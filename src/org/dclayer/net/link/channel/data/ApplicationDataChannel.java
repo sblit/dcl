@@ -86,7 +86,7 @@ public class ApplicationDataChannel extends ThreadDataChannel {
 	}
 
 	@Override
-	public void onClose() {
+	public void onCloseChannel() {
 		// TODO Auto-generated method stub
 		
 	}

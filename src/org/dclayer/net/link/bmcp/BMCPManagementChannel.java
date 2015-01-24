@@ -12,6 +12,8 @@ import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.component.FlexNum;
 import org.dclayer.net.link.Link;
+import org.dclayer.net.link.Link.CloseReason;
+import org.dclayer.net.link.Link.Status;
 import org.dclayer.net.link.bmcp.component.AckBMCPCommandComponent;
 import org.dclayer.net.link.bmcp.component.BMCPChannelDataComponent;
 import org.dclayer.net.link.bmcp.component.BMCPChannelReport;
@@ -24,6 +26,8 @@ import org.dclayer.net.link.bmcp.component.ConnectCryptoBMCPCommandComponent;
 import org.dclayer.net.link.bmcp.component.ConnectCryptoEchoReqBMCPCommandComponent;
 import org.dclayer.net.link.bmcp.component.ConnectEchoReplyBMCPCommandComponent;
 import org.dclayer.net.link.bmcp.component.ConnectFullEncryptionReqBMCPCommandComponent;
+import org.dclayer.net.link.bmcp.component.DisconnectBMCPCommandComponent;
+import org.dclayer.net.link.bmcp.component.KillLinkBMCPCommandComponent;
 import org.dclayer.net.link.bmcp.component.OpenChannelConfirmationBMCPCommandComponent;
 import org.dclayer.net.link.bmcp.component.OpenChannelRequestBMCPCommandComponent;
 import org.dclayer.net.link.bmcp.component.ThrottleBMCPCommandComponent;
@@ -70,6 +74,10 @@ public class BMCPManagementChannel extends ManagementChannel {
 	 * the data id of the current block status request
 	 */
 	private long channelBlockStatusRequestDataId = -1;
+	/**
+	 * the data id of the current disconnect command
+	 */
+	private long disconnectDataId = -1;
 	
 	/**
 	 * the {@link System#nanoTime()} value at the point in time the last throttle message was sent 
@@ -86,6 +94,12 @@ public class BMCPManagementChannel extends ManagementChannel {
 	
 	private long lastThrottleReceived = 0;
 	private long lastNumBytesSent = 0;
+	
+	/**
+	 * if set to true, will disconnect as soon as connected.
+	 * (used if disconnect() is called during connection initiation)
+	 */
+	private boolean disconnect = false;
 	
 	/**
 	 * a Thread for periodically requesting the channel block status from the peer
@@ -351,7 +365,7 @@ public class BMCPManagementChannel extends ManagementChannel {
 		
 		sendConnectConfirmation(discontinuousBlock);
 		
-		getLink().setStatus(Link.Status.Connected);
+		onConnected();
 		
 	}
 	
@@ -373,7 +387,7 @@ public class BMCPManagementChannel extends ManagementChannel {
 		// remove the FullEncryptionRequest packet that is currently being actively resent from the sent-PacketBackupCollection
 		clear(currentPendingDataId, 0);
 		
-		getLink().setStatus(Link.Status.Connected);
+		onConnected();
 		
 	}
 	
@@ -663,6 +677,23 @@ public class BMCPManagementChannel extends ManagementChannel {
 		
 	}
 	
+	public void onReceiveDisconnect(DiscontinuousBlock discontinuousBlock, long dataId, DisconnectBMCPCommandComponent disconnectBMCPCommandComponent) {
+		
+		Log.debug(this, "onReceiveDisconnect, link status: %s", getLink().getStatus());
+		
+		onDisconnected();
+		sendKillLink(discontinuousBlock);
+		
+	}
+	
+	public void onReceiveKillLink(DiscontinuousBlock discontinuousBlock, long dataId, KillLinkBMCPCommandComponent killLinkBMCPCommandComponent) {
+		
+		Log.debug(this, "onReceiveKillLink, link status: %s", getLink().getStatus());
+		
+		onRemoteKill();
+		
+	}
+	
 	// --- ACTION INITIATION METHODS, CALLED FROM OUTSIDE ---
 	
 	/**
@@ -672,6 +703,69 @@ public class BMCPManagementChannel extends ManagementChannel {
 		
 		sendConnect();
 		
+	}
+	
+	@Override
+	public void disconnect() {
+		
+		getLink().lockReceive();
+		
+		if(getLink().getStatus().connected()) {
+			
+			disconnectNow();
+			
+		} else if(getLink().getStatus().connecting()) {
+			
+			disconnect = true;
+			
+		}
+		
+		getLink().unlockReceive();
+		
+	}
+	
+	private void disconnectNow() {
+		getLink().setStatus(Status.Disconnecting);
+		sendDisconnect();
+	}
+	
+	private void onConnected() {
+
+		if(disconnect) {
+			Log.debug(this, "connected, but disconnect is true, disconnecting");
+			disconnectNow();
+		} else {
+			Log.debug(this, "connected");
+			getLink().onConnected();
+		}
+		
+	}
+	
+	private void onExit() {
+		exitResendThread();
+	}
+	
+	private void onDisconnected() {
+		
+		onExit();
+		getLink().onDisconnected();
+		
+	}
+	
+	private void onRemoteKill() {
+		
+		onExit();
+		if(getLink().getStatus().disconnecting()) {
+			onDisconnected();
+		} else {
+			onKilled(CloseReason.RemoteKill);
+		}
+		
+	}
+	
+	private void onKilled(CloseReason closeReason) {
+		Log.debug(this, "killed, CloseReason: %s", closeReason);
+		getLink().kill(closeReason);
 	}
 	
 	@Override
@@ -1058,6 +1152,34 @@ public class BMCPManagementChannel extends ManagementChannel {
 		throttleBMCPCommandComponent.setBytesPerSecond(bytesPerSecond);
 		
 		sendUnreliable(outBMCPChannelDataComponent);
+		
+		sendLock.unlock();
+		
+	}
+	
+	// locks sendLock
+	private void sendDisconnect() {
+		
+		sendLock.lock();
+		
+		outBMCPChannelDataComponent
+		.setDisconnectBMCPCommandComponent();
+		
+		disconnectDataId = send(outBMCPChannelDataComponent);
+		
+		sendLock.unlock();
+		
+	}
+	
+	// locks sendLock
+	private void sendKillLink(DiscontinuousBlock discontinuousBlock) {
+		
+		sendLock.lock();
+		
+		outBMCPChannelDataComponent
+		.setKillLinkBMCPCommandComponent();
+		
+		send(outBMCPChannelDataComponent, discontinuousBlock);
 		
 		sendLock.unlock();
 		

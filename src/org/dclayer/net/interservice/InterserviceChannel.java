@@ -10,6 +10,7 @@ import org.dclayer.crypto.key.KeyPair;
 import org.dclayer.crypto.key.RSAKey;
 import org.dclayer.exception.crypto.CryptoException;
 import org.dclayer.exception.net.buf.BufException;
+import org.dclayer.exception.net.buf.EndOfBufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
@@ -18,7 +19,6 @@ import org.dclayer.net.applicationchannel.ApplicationChannel;
 import org.dclayer.net.applicationchannel.ApplicationChannelTarget;
 import org.dclayer.net.applicationchannel.ServiceSideApplicationChannelActionListener;
 import org.dclayer.net.buf.ByteBuf;
-import org.dclayer.net.interservice.InterservicePolicy.ApplicationChannelEndpoints;
 import org.dclayer.net.interservice.applicationchannelslot.ApplicationChannelSlot;
 import org.dclayer.net.interservice.applicationchannelslot.ApplicationChannelSlotMap;
 import org.dclayer.net.interservice.message.ApplicationChannelDataInterserviceMessage;
@@ -105,6 +105,21 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 			this.version = VERSION;
 			sendVersion(this.version);
 		}
+	}
+
+	@Override
+	public synchronized void onCloseChannel() {
+		
+		Log.msg(this, "channel closed");
+		
+		for(NetworkSlot remoteNetworkSlot : remoteNetworkSlotMap) {
+			for(NetworkNode remoteNetworkNode : remoteNetworkSlot.getNetworkNodes()) {
+				interserviceChannelActionListener.onRemoveRemoteNetworkNode(this, remoteNetworkNode);
+			}
+		}
+		
+		interserviceChannelActionListener.onInterserviceChannelClosed(this);
+		
 	}
 	
 	private void removeRemoteAddressSlot(AddressSlot remoteAddressSlot) {
@@ -406,6 +421,9 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 				
 				inInterservicePacket.read(byteBuf);
 				
+			} catch(EndOfBufException e) {
+				Log.debug(this, "read ByteBuf ended");
+				return;
 			} catch(BufException e) {
 				Log.exception(this, e);
 			} catch (ParseException e) {
@@ -968,13 +986,6 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		
 		Log.msg(this, "sending data on application channel slot %s: %s", applicationChannelSlot, data);
 		sendApplicationChannelDataInterserviceMessage(applicationChannelSlot, data);
-		
-	}
-
-	@Override
-	public void onClose() {
-		
-		Log.msg(this, "channel closed");
 		
 	}
 	

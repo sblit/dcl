@@ -109,12 +109,16 @@ public class CircleRoutingTable extends RoutingTable implements HierarchicalLeve
 					
 				}
 				
-				nexthops = lastNexthops; // don't let lastNexthops be nexthops the next iteration
 				success = true;
+				
+			} else {
+				
+				// update lastNexthops only if we didn't remove anything
+				// (since we'd be setting lastNexthops to the Nexthops object we just removed otherwise)
+				lastNexthops = nexthops;
 				
 			}
 			
-			lastNexthops = nexthops;
 			nexthops = nexthops.getNext();
 			
 		} while(nexthops != null);

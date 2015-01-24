@@ -300,6 +300,10 @@ public abstract class DataChannel extends Channel implements ListenerByteBufInte
 		return 0;
 	}
 	
+	public void endReadByteBuf() {
+		asyncPipeByteBuf.end();
+	}
+	
 	public ByteBuf getReadByteBuf() {
 		return asyncPipeByteBuf;
 	}

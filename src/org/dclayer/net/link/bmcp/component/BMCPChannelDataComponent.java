@@ -30,6 +30,8 @@ public class BMCPChannelDataComponent extends ChannelDataComponent {
 	private OpenChannelConfirmationBMCPCommandComponent openChannelConfirmationBMCPCommandComponent = new OpenChannelConfirmationBMCPCommandComponent();
 	private ThrottleBMCPCommandComponent throttleBMCPCommandComponent = new ThrottleBMCPCommandComponent();
 	private AckBMCPCommandComponent ackBMCPCommandComponent = new AckBMCPCommandComponent();
+	private DisconnectBMCPCommandComponent disconnectBMCPCommandComponent = new DisconnectBMCPCommandComponent();
+	private KillLinkBMCPCommandComponent killLinkBMCPCommandComponent = new KillLinkBMCPCommandComponent();
 	
 	@Override
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
@@ -85,6 +87,14 @@ public class BMCPChannelDataComponent extends ChannelDataComponent {
 		}
 		case BMCPCommandComponent.ACK: {
 			setAckBMCPCommandComponent();
+			break;
+		}
+		case BMCPCommandComponent.DISCONNECT: {
+			setDisconnectBMCPCommandComponent();
+			break;
+		}
+		case BMCPCommandComponent.KILL_LINK: {
+			setKillLinkBMCPCommandComponent();
 			break;
 		}
 		default: {
@@ -230,6 +240,16 @@ public class BMCPChannelDataComponent extends ChannelDataComponent {
 	public AckBMCPCommandComponent setAckBMCPCommandComponent() {
 		this.commandComponent = ackBMCPCommandComponent;
 		return ackBMCPCommandComponent;
+	}
+	
+	public DisconnectBMCPCommandComponent setDisconnectBMCPCommandComponent() {
+		this.commandComponent = disconnectBMCPCommandComponent;
+		return disconnectBMCPCommandComponent;
+	}
+	
+	public KillLinkBMCPCommandComponent setKillLinkBMCPCommandComponent() {
+		this.commandComponent = killLinkBMCPCommandComponent;
+		return killLinkBMCPCommandComponent;
 	}
 	
 	/**

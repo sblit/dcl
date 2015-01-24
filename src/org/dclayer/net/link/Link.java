@@ -30,17 +30,52 @@ public class Link<T> implements HierarchicalLevel {
 	
 	public static enum Status {
 		None,
-		ConnectingActiveConnectRequested,
-		ConnectingPassiveEchoRequested,
-		ConnectingActiveEchoReplied,
-		ConnectingPassiveFullEncryptionRequested,
-		Connected,
+		ConnectingActiveConnectRequested(Status.CONNECTING),
+		ConnectingPassiveEchoRequested(Status.CONNECTING),
+		ConnectingActiveEchoReplied(Status.CONNECTING),
+		ConnectingPassiveFullEncryptionRequested(Status.CONNECTING),
+		Connected(Status.CONNECTED),
+		Disconnecting(Status.DISCONNECTING),
 		Disconnected;
+		
+		public static final int CONNECTED = 1 << 0;
+		public static final int CONNECTING = 1 << 1;
+		public static final int DISCONNECTING = 1 << 2;
+		
+		//
+		
+		private final boolean connected;
+		private final boolean connecting;
+		private final boolean disconnecting;
+		
+		Status(int flags) {
+			this.connected = (flags & CONNECTED) != 0;
+			this.connecting = (flags & CONNECTING) != 0;
+			this.disconnecting = (flags & DISCONNECTING) != 0;
+		}
+		
+		Status() {
+			this(0);
+		}
+		
+		public boolean connected() {
+			return connected;
+		}
+		
+		public boolean connecting() {
+			return connecting;
+		}
+		
+		public boolean disconnecting() {
+			return disconnecting;
+		}
+		
 	}
 	
 	public static enum CloseReason {
 		Disconnect,
-		Timeout
+		Timeout,
+		RemoteKill
 	}
 	
 	@Override
@@ -505,6 +540,44 @@ public class Link<T> implements HierarchicalLevel {
 		linkSendInterface.sendLinkPacket(referenceObject, data);
 	}
 	
+	public void onConnected() {
+
+		Log.debug(this, "connected");
+		setStatus(Status.Connected);
+		
+	}
+	
+	/**
+	 * callback for when:<br />
+	 * a) the remote disconnects, or<br />
+	 * b) we initiated the disconnect and the remote confirmed
+	 */
+	public void onDisconnected() {
+		
+		Log.debug(this, "disconnected, current status: %s", status);
+		setStatus(Status.Disconnected);
+		
+		closeChannels();
+		
+	}
+	
+	public void kill(CloseReason closeReason) {
+		
+		Log.debug(this, "killed, current status %s, close reason: %s", status, closeReason);
+		setStatus(Status.Disconnected);
+		
+		closeChannels();
+		
+	}
+	
+	private void closeChannels() {
+		synchronized(channelCollection) {
+			for(Channel channel : channelCollection.getChannels()) {
+				channel.onClose();
+			}
+		}
+	}
+	
 	//
 	
 	/**
@@ -541,6 +614,15 @@ public class Link<T> implements HierarchicalLevel {
 	 */
 	public void connect() {
 		connect(null);
+	}
+	
+	/**
+	 * tells the management channel to disconnects this link
+	 */
+	public void disconnect() {
+		
+		managementChannel.disconnect();
+		
 	}
 	
 	/**
@@ -625,15 +707,6 @@ public class Link<T> implements HierarchicalLevel {
 	 */
 	public ApplicationDataChannel getChannel(String channelName) {
 		return applicationChannelMap.get(channelName);
-	}
-	
-	public void kill(CloseReason closeReason) {
-		synchronized(channelCollection) {
-			for(Channel channel : channelCollection.getChannels()) {
-				channel.onClose();
-			}
-		}
-		setStatus(Status.Disconnected);
 	}
 	
 }

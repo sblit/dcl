@@ -110,6 +110,8 @@ public abstract class ManagementChannel extends Channel {
 	 */
 	private long unreliableChannelId;
 	
+	private boolean exitResendThread = false;
+	
 	/**
 	 * {@link ResendPacketQueue} for automatically resending lost packets
 	 */
@@ -129,6 +131,9 @@ public abstract class ManagementChannel extends Channel {
 					// timeout
 					timeout();
 					return;
+				} else if(exitResendThread) {
+					Log.debug(ManagementChannel.this, "resend thread: exiting");
+					return;
 				} else {
 					// resend this packet
 					resend(packetBackup);
@@ -141,6 +146,10 @@ public abstract class ManagementChannel extends Channel {
 	public ManagementChannel(Link link, long channelId, long unreliableChannelId, String channelName) {
 		super(link, channelId, channelName);
 		this.unreliableChannelId = unreliableChannelId;
+	}
+	
+	public void exitResendThread() {
+		exitResendThread = true;
 	}
 	
 	@Override
@@ -478,8 +487,14 @@ public abstract class ManagementChannel extends Channel {
 	}
 	
 	private void timeout() {
+		
+		receiveLock.lock();
+		
 		onTimeout();
 		getLink().kill(Link.CloseReason.Timeout);
+		
+		receiveLock.unlock();
+		
 	}
 	
 	@Override
@@ -508,6 +523,12 @@ public abstract class ManagementChannel extends Channel {
 	 * @param protocol the protocol of the new channel
 	 */
 	public abstract void requestOpenChannel(long channelId, String protocol);
+	
+	/**
+	 * called by the link, starts disconnect communication.
+	 * link will be killed by the management channel when disconnecting is done
+	 */
+	public abstract void disconnect();
 	
 	/**
 	 * reports the existence of a gap in the {@link DiscontinuousBlockCollection} of one of the channels upon packet receipt<br />
