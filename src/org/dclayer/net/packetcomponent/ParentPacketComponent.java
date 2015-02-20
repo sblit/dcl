@@ -1,16 +1,17 @@
 package org.dclayer.net.packetcomponent;
 
+
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.PacketComponentI;
 import org.dclayer.net.buf.ByteBuf;
 
-public abstract class ParentPacketComponent extends AutoPacketComponent<PacketComponentI> {
+public abstract class ParentPacketComponent extends AutoPacketComponent<PacketComponentI, AutoPacketComponentChildInfo<PacketComponentI>> {
 
 	private String name;
 	
 	public ParentPacketComponent(String name) {
-		super(PacketComponentI.class);
+		super(PacketComponentI.class, AutoPacketComponentChildInfo.class);
 		this.name = name;
 	}
 	
@@ -22,30 +23,30 @@ public abstract class ParentPacketComponent extends AutoPacketComponent<PacketCo
 	
 	@Override
 	public final void read(ByteBuf byteBuf) throws ParseException, BufException {
-		for(PacketComponentI child : children) {
-			child.read(byteBuf);
+		for(AutoPacketComponentChildInfo<?> child : children) {
+			child.packetComponent.read(byteBuf);
 		}
 	}
 
 	@Override
 	public final void write(ByteBuf byteBuf) throws BufException {
-		for(PacketComponentI child : children) {
-			child.write(byteBuf);
+		for(AutoPacketComponentChildInfo<?> child : children) {
+			child.packetComponent.write(byteBuf);
 		}
 	}
 
 	@Override
 	public final int length() {
 		int length = 0;
-		for(PacketComponentI child : children) {
-			length += child.length();
+		for(AutoPacketComponentChildInfo<?> child : children) {
+			length += child.packetComponent.length();
 		}
 		return length;
 	}
 
 	@Override
 	public final PacketComponentI[] getChildren() {
-		return children;
+		return packetComponentChildren;
 	}
 
 	@Override

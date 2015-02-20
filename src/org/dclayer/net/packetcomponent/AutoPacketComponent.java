@@ -1,5 +1,6 @@
 package org.dclayer.net.packetcomponent;
 
+
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.LinkedList;
@@ -7,7 +8,7 @@ import java.util.LinkedList;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.PacketComponentI;
 
-public abstract class AutoPacketComponent<T extends PacketComponentI> extends PacketComponent {
+public abstract class AutoPacketComponent<T extends PacketComponentI, U extends AutoPacketComponentChildInfo<T>> extends PacketComponent {
 	
 	private static class ChildField {
 		
@@ -23,15 +24,23 @@ public abstract class AutoPacketComponent<T extends PacketComponentI> extends Pa
 	
 	//
 	
-	protected final T[] children;
+	protected final U[] children;
+	protected final PacketComponentI[] packetComponentChildren;
 	
-	protected AutoPacketComponent(Class<T> commonType) {
-		this.children = collectChildren(commonType);
+	protected AutoPacketComponent(Class<?> packetComponentType, Class<?> childInfoType) {
+		
+		this.children = collectChildren(packetComponentType, childInfoType);
+		
+		this.packetComponentChildren = new PacketComponentI[this.children.length];
+		for(int i = 0; i < this.children.length; i++) {
+			this.packetComponentChildren[i] = this.children[i].packetComponent;
+		}
+		
 	}
 	
 	//
 	
-	private T[] collectChildren(Class<T> commonType) {
+	private U[] collectChildren(Class<?> packetComponentType, Class<?> childInfoType) {
 		
 		LinkedList<ChildField> fields = new LinkedList<>();
 		
@@ -42,12 +51,12 @@ public abstract class AutoPacketComponent<T extends PacketComponentI> extends Pa
 			}
 		}
 		
-		T[] children = (T[]) Array.newInstance(commonType, fields.size());
+		U[] children = (U[]) Array.newInstance(childInfoType, fields.size());
 		
 		for(ChildField childField : fields) {
 			
-			if(!commonType.isAssignableFrom(childField.field.getType())) {
-				throw new InstantiationError(String.format("AutoPacketComponent %s: Field '%s': Field type %s is not a sub-class of %s", this.getClass().getName(), childField.field.getName(), childField.field.getType().getName(), commonType.getName()));
+			if(!packetComponentType.isAssignableFrom(childField.field.getType())) {
+				throw new InstantiationError(String.format("AutoPacketComponent %s: Field '%s': Field type %s is not a sub-class of %s", this.getClass().getName(), childField.field.getName(), childField.field.getType().getName(), packetComponentType.getName()));
 			}
 			
 			if(children[childField.child.index()] != null) {
@@ -72,7 +81,18 @@ public abstract class AutoPacketComponent<T extends PacketComponentI> extends Pa
 				throw new InstantiationError(String.format("AutoPacketComponent %s: Field '%s': Could not access", this.getClass().getName(), childField.field.getName()));
 			}
 			
-			children[childField.child.index()] = packetComponent;
+			U childInfo;
+			try {
+				childInfo = (U) childInfoType.newInstance();
+			} catch (InstantiationException e) {
+				throw new InstantiationError(String.format("AutoPacketComponent %s: Could not instantiate child info type %s (InstantiationException)", this.getClass().getName(), childInfoType.getName()));
+			} catch (IllegalAccessException e) {
+				throw new InstantiationError(String.format("AutoPacketComponent %s: Could not instantiate child info type %s (IllegalAccessException)", this.getClass().getName(), childInfoType.getName()));
+			}
+			
+			childInfo.packetComponent = packetComponent;
+			
+			children[childField.child.index()] = childInfo;
 			
 		}
 		

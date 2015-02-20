@@ -1,12 +1,16 @@
 package org.dclayer.net.packetcomponent;
 
+
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.exception.net.parse.UnsupportedMessageTypeException;
 import org.dclayer.net.PacketComponentI;
 import org.dclayer.net.buf.ByteBuf;
 
-public abstract class SwitchPacketComponent<T extends PacketComponentI> extends AutoPacketComponent<T> {
+public abstract class SwitchPacketComponent<T extends PacketComponentI> extends AutoPacketComponent<T, SwitchPacketComponent.ChildInfo<T>> {
 	
 	private static interface TypeComponent {
 		
@@ -16,29 +20,35 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 		
 	}
 	
-	//
-
-	private String name;
+	protected static class ChildInfo<U extends PacketComponentI> extends AutoPacketComponentChildInfo<U> {
+		Method onReceiveMethod;
+	}
 	
-	private T activeChild;
+	//
+	
+	private ChildInfo<T> activeChild;
 	private int type;
 	
 	private final TypeComponent typeComponent;
 	
-	public SwitchPacketComponent(String name, Class<T> commonType) {
-		
-		super(commonType);
-		
-		this.name = name;
-		this.typeComponent = makeTypeComponent(children.length);
-		
-	}
+	private Object onReceiveObject;
 	
-	public SwitchPacketComponent(Class<T> commonType) {
-		this(null, commonType);
+	public SwitchPacketComponent() {
+		super(PacketComponentI.class, ChildInfo.class);
+		this.typeComponent = makeTypeComponent(children.length);
 	}
 	
 	//
+	
+	public void loadOnReceiveObject(Object onReceiveObject) {
+		this.onReceiveObject = onReceiveObject;
+		for(Method method : onReceiveObject.getClass().getMethods()) {
+			OnReceive onReceiveAnnotation = method.getAnnotation(OnReceive.class);
+			if(onReceiveAnnotation != null) {
+				children[onReceiveAnnotation.index()].onReceiveMethod = method;
+			}
+		}
+	}
 	
 	private TypeComponent makeTypeComponent(int numChildren) {
 		
@@ -116,7 +126,7 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 		this.type = type;
 		
 		activeChild = children[type];
-		activeChild.read(byteBuf);
+		activeChild.packetComponent.read(byteBuf);
 		
 	}
 
@@ -124,34 +134,46 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 	public final void write(ByteBuf byteBuf) throws BufException {
 		
 		typeComponent.writeType(byteBuf, type);
-		activeChild.write(byteBuf);
+		activeChild.packetComponent.write(byteBuf);
 		
 	}
 
 	@Override
 	public final int length() {
 		
-		return typeComponent.typeLength() + activeChild.length();
+		return typeComponent.typeLength() + activeChild.packetComponent.length();
 		
 	}
 
 	@Override
 	public final PacketComponentI[] getChildren() {
-		return new PacketComponentI[] { activeChild };
+		return new PacketComponentI[] { activeChild.packetComponent };
 	}
 
 	@Override
 	public String toString() {
-		if(name == null) name = this.getClass().getSimpleName();
-		return String.format("%s(type=%d)", name, type);
+		return String.format("%s(type=%d)", this.getClass().getSimpleName(), type);
 	}
 	
 	public T get() {
-		return activeChild;
+		return activeChild.packetComponent;
 	}
 	
 	public T set(int index) {
-		return activeChild = children[index];
+		type = index;
+		return (activeChild = children[index]).packetComponent;
+	}
+	
+	public void callOnReceive() {
+		try {
+			activeChild.onReceiveMethod.invoke(onReceiveObject, activeChild.packetComponent);
+		} catch (IllegalAccessException e) {
+			throw new RuntimeException(e);
+		} catch (IllegalArgumentException e) {
+			throw new RuntimeException(e);
+		} catch (InvocationTargetException e) {
+			throw new RuntimeException(e);
+		}
 	}
 	
 }
