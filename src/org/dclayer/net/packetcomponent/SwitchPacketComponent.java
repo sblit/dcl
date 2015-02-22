@@ -69,8 +69,8 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 				
 				Class<?>[] parameterTypes = method.getParameterTypes();
 				if(parameterTypes.length != 1
-						|| !parameterTypes[0].isAssignableFrom(child.packetComponent.getClass())) {
-					throw new InstantiationError(String.format("Invalid on receive callback method '%s': must accept exactly one parameter of type or supertype of '%s'", method.getName(), child.packetComponent.getClass().getSimpleName()));
+						|| !parameterTypes[0].isAssignableFrom(child.getField().getType())) {
+					throw new InstantiationError(String.format("Invalid on receive callback method '%s': must accept exactly one parameter of type or supertype of '%s'", method.getName(), child.getField().getType().getSimpleName()));
 				}
 				
 				child.onReceiveMethod = method;
@@ -159,7 +159,7 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 		this.type = type;
 		
 		activeChild = children[type];
-		activeChild.packetComponent.read(byteBuf);
+		activeChild.getPacketComponent().read(byteBuf);
 		
 	}
 
@@ -167,20 +167,20 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 	public final void write(ByteBuf byteBuf) throws BufException {
 		
 		typeComponent.writeType(byteBuf, type);
-		activeChild.packetComponent.write(byteBuf);
+		activeChild.getPacketComponent().write(byteBuf);
 		
 	}
 
 	@Override
 	public final int length() {
 		
-		return typeComponent.typeLength() + activeChild.packetComponent.length();
+		return typeComponent.typeLength() + activeChild.getPacketComponent().length();
 		
 	}
 
 	@Override
 	public final PacketComponentI[] getChildren() {
-		return new PacketComponentI[] { activeChild.packetComponent };
+		return new PacketComponentI[] { activeChild.getPacketComponent() };
 	}
 
 	@Override
@@ -189,12 +189,12 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 	}
 	
 	public T get() {
-		return activeChild.packetComponent;
+		return activeChild.getPacketComponent();
 	}
 	
 	public T set(int index) {
 		type = index;
-		return (activeChild = children[index]).packetComponent;
+		return (activeChild = children[index]).getPacketComponent();
 	}
 	
 	public <W extends AutoPacketComponent<?, ?>> W set(W child) {
@@ -204,7 +204,7 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 	
 	public void callOnReceive() {
 		try {
-			activeChild.onReceiveMethod.invoke(onReceiveObject, activeChild.packetComponent);
+			activeChild.onReceiveMethod.invoke(onReceiveObject, activeChild.getPacketComponent());
 		} catch (IllegalAccessException e) {
 			throw new RuntimeException(e);
 		} catch (IllegalArgumentException e) {

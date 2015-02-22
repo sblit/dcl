@@ -10,5 +10,6 @@ import java.lang.annotation.Target;
 public @interface Child {
 	
 	int index();
-
+	boolean create() default true;
+	
 }

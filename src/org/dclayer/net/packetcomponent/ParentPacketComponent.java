@@ -10,6 +10,8 @@ public abstract class ParentPacketComponent extends AutoPacketComponent<PacketCo
 
 	private String name;
 	
+	private PacketComponentI[] packetComponentChildren;
+	
 	public ParentPacketComponent(String name) {
 		super(PacketComponentI.class, AutoPacketComponentChildInfo.class);
 		this.name = name;
@@ -24,14 +26,14 @@ public abstract class ParentPacketComponent extends AutoPacketComponent<PacketCo
 	@Override
 	public final void read(ByteBuf byteBuf) throws ParseException, BufException {
 		for(AutoPacketComponentChildInfo<?> child : children) {
-			child.packetComponent.read(byteBuf);
+			child.getPacketComponent().read(byteBuf);
 		}
 	}
 
 	@Override
 	public final void write(ByteBuf byteBuf) throws BufException {
 		for(AutoPacketComponentChildInfo<?> child : children) {
-			child.packetComponent.write(byteBuf);
+			child.getPacketComponent().write(byteBuf);
 		}
 	}
 
@@ -39,13 +41,19 @@ public abstract class ParentPacketComponent extends AutoPacketComponent<PacketCo
 	public final int length() {
 		int length = 0;
 		for(AutoPacketComponentChildInfo<?> child : children) {
-			length += child.packetComponent.length();
+			length += child.getPacketComponent().length();
 		}
 		return length;
 	}
 
 	@Override
 	public final PacketComponentI[] getChildren() {
+		if(packetComponentChildren == null) {
+			packetComponentChildren = new PacketComponentI[children.length];
+			for(int i = 0; i < children.length; i++) {
+				packetComponentChildren[i] = children[i].getPacketComponent();
+			}
+		}
 		return packetComponentChildren;
 	}
 
