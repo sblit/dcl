@@ -197,6 +197,11 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 		return (activeChild = children[index]).packetComponent;
 	}
 	
+	public <W extends AutoPacketComponent<?, ?>> W set(W child) {
+		set(child.indexInParent);
+		return child;
+	}
+	
 	public void callOnReceive() {
 		try {
 			activeChild.onReceiveMethod.invoke(onReceiveObject, activeChild.packetComponent);

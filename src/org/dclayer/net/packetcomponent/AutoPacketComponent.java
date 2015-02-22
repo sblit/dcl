@@ -24,6 +24,8 @@ public abstract class AutoPacketComponent<T extends PacketComponentI, U extends 
 	
 	//
 	
+	protected int indexInParent;
+	
 	protected final U[] children;
 	protected final PacketComponentI[] packetComponentChildren;
 	
@@ -91,6 +93,10 @@ public abstract class AutoPacketComponent<T extends PacketComponentI, U extends 
 			}
 			
 			childInfo.packetComponent = packetComponent;
+			
+			if(packetComponent instanceof AutoPacketComponent<?, ?>) {
+				((AutoPacketComponent<?, ?>) packetComponent).indexInParent = childField.child.index();
+			}
 			
 			children[childField.child.index()] = childInfo;
 			
