@@ -1,9 +1,18 @@
 package org.dclayer.net;
 
+import org.dclayer.exception.net.buf.BufException;
+import org.dclayer.exception.net.parse.ParseException;
+import org.dclayer.net.buf.ByteBuf;
+
 /**
  * byte array wrapper
  */
-public class Data {
+public class Data implements PacketComponentI {
+	
+	public static final int GROW = -1;
+	
+	//
+	
 	/**
 	 * the byte array containing the data
 	 */
@@ -16,6 +25,8 @@ public class Data {
 	 * the length specifying how long the usable area of the byte array is
 	 */
 	protected int length;
+	
+	private boolean grow = false;
 	
 	/**
 	 * creates a new {@link Data} instance
@@ -36,11 +47,16 @@ public class Data {
 	}
 	
 	/**
-	 * creates a new Data instance, also newly creating the underlying byte array if length > 0
+	 * creates a new Data instance, also newly creating the underlying byte array.
+	 * pass {@link Data#GROW} to make this grow infinitely.
 	 * @param length the length for the newly created byte array
 	 */
 	public Data(int length) {
-		prepare(length);
+		if(length < 0) {
+			this.grow = true;
+		} else {
+			prepare(length);
+		}
 	}
 	
 	/**
@@ -48,19 +64,91 @@ public class Data {
 	 * This is the same as using Data(0).
 	 */
 	public Data() {
-		this(0);
+		
 	}
 	
 	/**
-	 * adapts the space in this {@link Data} to the given length value, enlarging the underlying byte array if necessary
+	 * adapts the space in this {@link Data} to the given length value, resetting offset to zero, enlarging the underlying byte array if necessary.
+	 * contained data might be lost. use {@link Data#resize(int)} to keep data.
 	 * @param length the amount of bytes the space in this {@link Data} needs to be adapted to
 	 */
 	public void prepare(int length) {
-		if(data == null || length > this.length) {
+		if(data == null || length > data.length) {
 			reset(new byte[length], 0, length);
 		} else {
 			reset(0, length);
 		}
+	}
+	
+	/**
+	 * resizes this {@link Data} to the given amount of bytes. keeps the stored data.
+	 * @param length the amount of bytes the space in this {@link Data} needs to be adapted to
+	 */
+	public void resize(int length) {
+		
+		resize(length, length);
+	
+	}
+	
+	/**
+	 * resizes this {@link Data} to the amount of bytes given in the first parameter.
+	 * if a new underlying byte array has to be created, it will have the length given in the second parameter.
+	 * @param dataLength the amount of bytes the space in this {@link Data} needs to be adapted to
+	 * @param bytesLength the length of the new underlying byte array, if one has to be created
+	 */
+	public void resize(int dataLength, int bytesLength) {
+		
+		if(data == null) {
+			
+			reset(new byte[dataLength], 0, dataLength);
+			
+		} else if((offset + dataLength) > data.length) {
+			
+			if(dataLength <= data.length) {
+				
+				// data would fit in the current byte array - move it to the beginning of the byte array
+				for(int i = 0; i < data.length; i++) {
+					data[i] = i < this.length ? data[offset+i] : 0;
+				}
+				reset(0, dataLength);
+				
+			} else {
+				
+				// a new byte array is needed
+				byte[] newData = new byte[Math.max(bytesLength, dataLength)];
+				System.arraycopy(data, offset, newData, 0, this.length);
+				reset(newData, 0, dataLength);
+			
+			}
+			
+		} else {
+			
+			if(dataLength > this.length) {
+				for(int i = this.length; i < dataLength; i++) {
+					data[i] = 0;
+				}
+			}
+			
+			reset(offset, dataLength);
+			
+		}
+	}
+	
+	/**
+	 * resizes this {@link Data} to the given amount of bytes, keeping the stored data.
+	 * if a new underlying byte array has to be created, it will be bigger than the given length
+	 * to reduce the number of future byte array allocations.
+	 * @param length the amount of bytes the space in this {@link Data} needs to be adapted to
+	 */
+	public void enlarge(int length) {
+		resize(length, Math.max(length + 32, length * 2));
+	}
+	
+	/**
+	 * resets both offset and length values to zero
+	 */
+	public void reset() {
+		reset(0, 0);
 	}
 	
 	/**
@@ -76,10 +164,18 @@ public class Data {
 	/**
 	 * resets offset relative to the current offset and sets length value
 	 * @param relativeOffset the relative offset specifying where the data starts in the byte array, relative to the current offset
-	 * @param length the length specifying how long the usable area of the byte array is
+	 * @param absoluteLength the length specifying how long the usable area of the byte array is
 	 */
-	public void relativeReset(int relativeOffset, int length) {
-		reset(offset+relativeOffset, length);
+	public void relativeReset(int relativeOffset, int absoluteLength) {
+		reset(offset+relativeOffset, absoluteLength);
+	}
+	
+	/**
+	 * resets offset relative to the current offset and adjusts length value, keeping the absolute position of the last byte
+	 * @param relativeOffset the relative offset specifying where the data starts in the byte array, relative to the current offset
+	 */
+	public void relativeReset(int relativeOffset) {
+		reset(offset+relativeOffset, length-relativeOffset);
 	}
 	
 	/**
@@ -199,6 +295,9 @@ public class Data {
 	 */
 	public void setByte(int index, byte b) {
 		if(index < 0) index += length;
+		if(grow && index >= length) {
+			enlarge(index + 1);
+		}
 		this.data[offset + index] = b;
 	}
 	
@@ -210,7 +309,29 @@ public class Data {
 	 * @param length the amount of bytes to copy from the given byte array
 	 */
 	public void setBytes(int index, byte[] bytes, int offset, int length) {
+		if(grow && (index + length) > this.length) {
+			enlarge(index + length);
+		}
 		System.arraycopy(bytes, offset, data, index, length);
+	}
+	
+	/**
+	 * copies the bytes contained in the given {@link Data} object to the specified position in this {@link Data} object
+	 * @param index the position inside this {@link Data} object to copy the given bytes to
+	 * @param copyData the {@link Data} object to copy from
+	 */
+	public void setBytes(int index, Data copyData) {
+		setBytes(index, copyData, copyData.length());
+	}
+	
+	/**
+	 * copies the bytes contained in the given {@link Data} object to the specified position in this {@link Data} object
+	 * @param index the position inside this {@link Data} object to copy the given bytes to
+	 * @param copyData the {@link Data} object to copy from
+	 * @param length the amount of bytes to copy from the given {@link Data} object
+	 */
+	public void setBytes(int index, Data copyData, int length) {
+		setBytes(index, copyData.getData(), copyData.offset(), length);
 	}
 	
 	/**
@@ -292,6 +413,36 @@ public class Data {
 			}
 			data[index] |= b;
 		}
+	}
+
+	@Override
+	public void write(ByteBuf byteBuf) throws BufException {
+		byteBuf.write(this);
+	}
+
+	@Override
+	public void read(ByteBuf byteBuf) throws ParseException, BufException {
+		byteBuf.read(this);
+	}
+
+	@Override
+	public PacketComponentI[] getChildren() {
+		return null;
+	}
+
+	@Override
+	public String represent() {
+		return String.format("Data(%s)", toString());
+	}
+
+	@Override
+	public String represent(boolean tree) {
+		return PacketComponent.represent(this, tree);
+	}
+
+	@Override
+	public String represent(boolean tree, int level) {
+		return PacketComponent.represent(this, tree, level);
 	}
 	
 }
