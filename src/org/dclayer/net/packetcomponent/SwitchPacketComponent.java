@@ -38,16 +38,49 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 		this.typeComponent = makeTypeComponent(children.length);
 	}
 	
+	public SwitchPacketComponent(Object onReceiveObject) {
+		this();
+		collectOnReceiveMethods(onReceiveObject);
+	}
+	
 	//
 	
+	/**
+	 * scans the given object for methods with {@link OnReceive} annotations and
+	 * stores them for later use with {@link #callOnReceive()}
+	 * @param onReceiveObject the object to scan
+	 * @deprecated use constructor {@link #SwitchPacketComponent(Object)} instead
+	 */
+	@Deprecated
 	public void loadOnReceiveObject(Object onReceiveObject) {
-		this.onReceiveObject = onReceiveObject;
+		
+		collectOnReceiveMethods(onReceiveObject);
+	
+	}
+	
+	private void collectOnReceiveMethods(Object onReceiveObject) {
+		
 		for(Method method : onReceiveObject.getClass().getMethods()) {
+			
 			OnReceive onReceiveAnnotation = method.getAnnotation(OnReceive.class);
 			if(onReceiveAnnotation != null) {
-				children[onReceiveAnnotation.index()].onReceiveMethod = method;
+				
+				ChildInfo<T> child = children[onReceiveAnnotation.index()];
+				
+				Class<?>[] parameterTypes = method.getParameterTypes();
+				if(parameterTypes.length != 1
+						|| !parameterTypes[0].isAssignableFrom(child.packetComponent.getClass())) {
+					throw new InstantiationError(String.format("Invalid on receive callback method '%s': must accept exactly one parameter of type or supertype of '%s'", method.getName(), child.packetComponent.getClass().getSimpleName()));
+				}
+				
+				child.onReceiveMethod = method;
+				
 			}
+			
 		}
+
+		this.onReceiveObject = onReceiveObject;
+		
 	}
 	
 	private TypeComponent makeTypeComponent(int numChildren) {
