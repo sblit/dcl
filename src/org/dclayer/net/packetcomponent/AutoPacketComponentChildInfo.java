@@ -9,22 +9,27 @@ public class AutoPacketComponentChildInfo<T extends PacketComponentI> {
 	private Field field;
 	private Object object;
 	
-	private T packetComponent;
+	private int index;
+	
+	private T packetComponent = null;
 	
 	public void setField(Field field, Object object) {
 		this.field = field;
+		this.object = object;
 	}
 	
 	public Field getField() {
 		return field;
 	}
 	
-	public void setPacketComponent(T packetComponent) {
-		this.packetComponent = packetComponent;
+	public void setIndex(int index) {
+		this.index = index;
 	}
 	
 	public T getPacketComponent() {
+		
 		if(packetComponent == null) {
+			
 			try {
 				packetComponent = (T) field.get(object);
 			} catch (IllegalArgumentException e) {
@@ -32,6 +37,11 @@ public class AutoPacketComponentChildInfo<T extends PacketComponentI> {
 			} catch (IllegalAccessException e) {
 				throw new RuntimeException(String.format("AutoPacketComponent %s: Field '%s': Could not access", field.getName(), object), e);
 			}
+			
+			if(packetComponent instanceof AutoPacketComponent<?, ?>) {
+				((AutoPacketComponent<?, ?>) packetComponent).indexInParent = index;
+			}
+			
 		}
 		return packetComponent;
 	}

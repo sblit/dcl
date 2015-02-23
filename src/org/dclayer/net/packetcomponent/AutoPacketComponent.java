@@ -3,6 +3,7 @@ package org.dclayer.net.packetcomponent;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.LinkedList;
 
 import org.dclayer.net.PacketComponent;
@@ -59,10 +60,10 @@ public abstract class AutoPacketComponent<T extends PacketComponentI, U extends 
 				throw new InstantiationError(String.format("AutoPacketComponent %s: Field '%s': Duplicate index %d", this.getClass().getName(), childField.field.getName(), childField.child.index()));
 			}
 			
-			T packetComponent;
-			
 			if(childField.child.create()) {
-			
+				
+				T packetComponent;
+				
 				try {
 					packetComponent = (T) childField.field.getType().newInstance();
 				} catch (InstantiationException e) {
@@ -72,16 +73,14 @@ public abstract class AutoPacketComponent<T extends PacketComponentI, U extends 
 				}
 				
 				try {
+					
 					childField.field.set(this, packetComponent);
+					
 				} catch (IllegalArgumentException e) {
 					throw new InstantiationError(String.format("AutoPacketComponent %s: Field '%s': Could not assign instance of type %s", this.getClass().getName(), childField.field.getName(), childField.field.getType().getName()));
 				} catch (IllegalAccessException e) {
 					throw new InstantiationError(String.format("AutoPacketComponent %s: Field '%s': Could not access", this.getClass().getName(), childField.field.getName()));
 				}
-			
-			} else {
-				
-				packetComponent = null;
 				
 			}
 			
@@ -94,12 +93,8 @@ public abstract class AutoPacketComponent<T extends PacketComponentI, U extends 
 				throw new InstantiationError(String.format("AutoPacketComponent %s: Could not instantiate child info type %s (IllegalAccessException)", this.getClass().getName(), childInfoType.getName()));
 			}
 			
-			childInfo.setPacketComponent(packetComponent);
 			childInfo.setField(childField.field, this);
-			
-			if(packetComponent instanceof AutoPacketComponent<?, ?>) {
-				((AutoPacketComponent<?, ?>) packetComponent).indexInParent = childField.child.index();
-			}
+			childInfo.setIndex(childField.child.index());
 			
 			children[childField.child.index()] = childInfo;
 			
