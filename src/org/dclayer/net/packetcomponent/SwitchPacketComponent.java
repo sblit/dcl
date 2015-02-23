@@ -198,6 +198,9 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 	}
 	
 	public <W extends AutoPacketComponent<?, ?>> W set(W child) {
+		if(child.indexInParent < 0) {
+			accessChildrenPacketComponents();
+		}
 		set(child.indexInParent);
 		return child;
 	}

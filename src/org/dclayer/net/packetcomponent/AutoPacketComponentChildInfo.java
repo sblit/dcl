@@ -43,7 +43,9 @@ public class AutoPacketComponentChildInfo<T extends PacketComponentI> {
 			}
 			
 		}
+		
 		return packetComponent;
+		
 	}
 	
 }

@@ -25,7 +25,7 @@ public abstract class AutoPacketComponent<T extends PacketComponentI, U extends 
 	
 	//
 	
-	protected int indexInParent;
+	protected int indexInParent = -1;
 	
 	protected final U[] children;
 	
@@ -102,6 +102,12 @@ public abstract class AutoPacketComponent<T extends PacketComponentI, U extends 
 		
 		return children;
 		
+	}
+	
+	protected void accessChildrenPacketComponents() {
+		for(U childInfo : children) {
+			childInfo.getPacketComponent();
+		}
 	}
 	
 }
