@@ -8,6 +8,42 @@ import org.dclayer.net.buf.ByteBuf;
  * abstract class that parts of packets (e.g. {@link Rev0Message} and {@link ServiceAddressComponent}) extend.
  */
 public abstract class PacketComponent implements PacketComponentI {
+	
+	public static String represent(PacketComponentI packetComponentI, boolean tree, int level) {
+		PacketComponentI[] children = packetComponentI.getChildren();
+		StringBuilder b = new StringBuilder();
+		String indent = null;
+		if(tree) {
+			StringBuilder ib = new StringBuilder();
+			for(int i = 0; i < level; i++) ib.append("    ");
+			indent = ib.toString();
+			b.append(indent);
+		}
+		b.append(packetComponentI.toString());
+		if(children != null && children.length > 0) {
+			int ii = 0;
+			for(int i = 0; i < children.length; i++) {
+				PacketComponentI child = children[i];
+				if(child == null) continue;
+				if(ii++ > 0) b.append(", ");
+				else b.append(" {");
+				if(tree) b.append("\n");
+				b.append(child.represent(tree, level+1));
+			}
+			if(ii > 0) {
+				if(tree) b.append("\n").append(indent);
+				b.append("}");
+			}
+		}
+		return b.toString();
+	}
+	
+	public static String represent(PacketComponentI packetComponentI, boolean tree) {
+		return represent(packetComponentI, tree, 0);
+	}
+	
+	//
+	
 	/**
 	 * constructor called when this {@link PacketComponent} is reconstructed from data in a {@link ByteBuf}
 	 * @param byteBuf the {@link ByteBuf} this {@link PacketComponent} is read from
@@ -33,32 +69,7 @@ public abstract class PacketComponent implements PacketComponentI {
 	 */
 	@Override
 	public final String represent(boolean tree, int level) {
-		PacketComponentI[] children = this.getChildren();
-		StringBuilder b = new StringBuilder();
-		String indent = null;
-		if(tree) {
-			StringBuilder ib = new StringBuilder();
-			for(int i = 0; i < level; i++) ib.append("    ");
-			indent = ib.toString();
-			b.append(indent);
-		}
-		b.append(this.toString());
-		if(children != null && children.length > 0) {
-			int ii = 0;
-			for(int i = 0; i < children.length; i++) {
-				PacketComponentI child = children[i];
-				if(child == null) continue;
-				if(ii++ > 0) b.append(", ");
-				else b.append(" {");
-				if(tree) b.append("\n");
-				b.append(child.represent(tree, level+1));
-			}
-			if(ii > 0) {
-				if(tree) b.append("\n").append(indent);
-				b.append("}");
-			}
-		}
-		return b.toString();
+		return PacketComponent.represent(this, tree, level);
 	}
 	
 	/**
@@ -68,7 +79,7 @@ public abstract class PacketComponent implements PacketComponentI {
 	 */
 	@Override
 	public final String represent(boolean tree) {
-		return represent(tree, 0);
+		return PacketComponent.represent(this, tree);
 	}
 	
 	/**
