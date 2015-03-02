@@ -20,7 +20,7 @@ public class ByteBufInputStream extends InputStream {
 	@Override
 	public int read() throws IOException {
 		try {
-			return byteBuf.read();
+			return 0xFF & byteBuf.read();
 		} catch (BufException e) {
 			throw new IOException(e);
 		}
