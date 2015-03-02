@@ -11,8 +11,6 @@ import org.dclayer.net.applicationchannel.ApplicationChannel;
 import org.dclayer.net.applicationchannel.ApplicationChannelTarget;
 import org.dclayer.net.network.NetworkType;
 
-import com.sun.xml.internal.ws.policy.privateutil.PolicyUtils.Collections;
-
 public class InterservicePolicy {
 	
 	public static class ApplicationChannelEndpoints {
