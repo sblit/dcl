@@ -1,5 +1,6 @@
 package org.dclayer.net.circle;
 
+import org.dclayer.crypto.hash.Hash;
 import org.dclayer.crypto.hash.HashAlgorithm;
 import org.dclayer.exception.net.parse.MalformedAttributeStringException;
 import org.dclayer.exception.net.parse.ParseException;
@@ -18,6 +19,7 @@ import org.dclayer.net.network.slot.GenericNetworkSlot;
 public class CircleNetworkType extends NetworkType<CircleNetworkType> {
 	
 	private HashAlgorithm hashAlgorithm;
+	private Hash hash;
 	private int byteLength;
 	
 	public CircleNetworkType(String attributeString) throws ParseException {
@@ -57,13 +59,19 @@ public class CircleNetworkType extends NetworkType<CircleNetworkType> {
 	public Data scaleAddress(Address address) {
 		
 		Data fullData = address.toData();
-		if(byteLength == hashAlgorithm.getDigestNumBytes()) return fullData;
+		
+		if(hash == null) {
+			hash = hashAlgorithm.getInstance();
+		}
+		Data hashedData = hash.update(fullData).finish();
+		
+		if(byteLength == hashedData.length()) return hashedData;
 		
 		Data scaledData = new Data(byteLength);
 		
-		for(int i = 0; i < fullData.length(); i++) {
+		for(int i = 0; i < hashedData.length(); i++) {
 			int scaledIndex = i % scaledData.length();
-			scaledData.setByte(scaledIndex, (byte)(scaledData.getByte(scaledIndex) ^ fullData.getByte(i)));
+			scaledData.setByte(scaledIndex, (byte)(scaledData.getByte(scaledIndex) ^ hashedData.getByte(i)));
 		}
 		
 		return scaledData;
