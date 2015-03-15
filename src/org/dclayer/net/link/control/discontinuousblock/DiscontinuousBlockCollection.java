@@ -2,6 +2,7 @@ package org.dclayer.net.link.control.discontinuousblock;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
+import org.dclayer.net.Data;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.link.control.packetbackup.PacketBackupCollection;
 
@@ -129,6 +130,24 @@ public class DiscontinuousBlockCollection implements HierarchicalLevel {
 		}
 		setUsed(block, true);
 		block.store(dataId, byteBuf, length);
+		return dataId == dataIdRead; // -> read!
+	}
+	
+	/**
+	 * stores the given data for the given data id in a {@link DiscontinuousBlock} object
+	 * @param dataId the data id of the data that should be stored
+	 * @param data the data to store
+	 * @return true if the given data id is the data id of the block that is next in order for reading, false otherwise
+	 * @throws BufException
+	 */
+	public synchronized boolean put(long dataId, Data data) throws BufException {
+		int index = getIndex(dataId, true);
+		DiscontinuousBlock block = blocks[index];
+		if(block == null) {
+			block = blocks[index] = new DiscontinuousBlock();
+		}
+		setUsed(block, true);
+		block.store(dataId, data);
 		return dataId == dataIdRead; // -> read!
 	}
 	

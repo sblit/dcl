@@ -3,16 +3,19 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.dclayer.crypto.key.KeyPair;
+import org.dclayer.exception.crypto.CryptoException;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
+import org.dclayer.net.PacketComponentI;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.buf.DataByteBuf;
-import org.dclayer.net.buf.TransparentByteBuf;
 import org.dclayer.net.link.bmcp.BMCPManagementChannel;
-import org.dclayer.net.link.bmcp.crypto.TransparentByteBufGenerator;
+import org.dclayer.net.link.bmcp.crypto.PacketCipher;
+import org.dclayer.net.link.bmcp.crypto.PlainPacketCipher;
 import org.dclayer.net.link.channel.Channel;
 import org.dclayer.net.link.channel.ChannelCollection;
 import org.dclayer.net.link.channel.data.ApplicationDataChannel;
@@ -30,27 +33,30 @@ public class Link<T> implements HierarchicalLevel {
 	
 	public static enum Status {
 		None,
-		ConnectingActiveConnectRequested(Status.CONNECTING),
-		ConnectingPassiveEchoRequested(Status.CONNECTING),
-		ConnectingActiveEchoReplied(Status.CONNECTING),
-		ConnectingPassiveFullEncryptionRequested(Status.CONNECTING),
+		ConnectingActive(Status.CONNECTING),
+		ConnectingPassive(Status.CONNECTING),
+		InitializingActive(Status.INITIALIZING),
+		InitializingPassive(Status.INITIALIZING),
 		Connected(Status.CONNECTED),
 		Disconnecting(Status.DISCONNECTING),
 		Disconnected;
 		
 		public static final int CONNECTED = 1 << 0;
 		public static final int CONNECTING = 1 << 1;
-		public static final int DISCONNECTING = 1 << 2;
+		public static final int INITIALIZING = 1 << 2;
+		public static final int DISCONNECTING = 1 << 3;
 		
 		//
 		
 		private final boolean connected;
 		private final boolean connecting;
+		private final boolean initializing;
 		private final boolean disconnecting;
 		
 		Status(int flags) {
 			this.connected = (flags & CONNECTED) != 0;
 			this.connecting = (flags & CONNECTING) != 0;
+			this.initializing = (flags & INITIALIZING) != 0;
 			this.disconnecting = (flags & DISCONNECTING) != 0;
 		}
 		
@@ -66,6 +72,10 @@ public class Link<T> implements HierarchicalLevel {
 			return connecting;
 		}
 		
+		public boolean initializing() {
+			return initializing;
+		}
+		
 		public boolean disconnecting() {
 			return disconnecting;
 		}
@@ -75,7 +85,9 @@ public class Link<T> implements HierarchicalLevel {
 	public static enum CloseReason {
 		Disconnect,
 		Timeout,
-		RemoteKill
+		RemoteKill,
+		ExceptionInCryptoInit,
+		UnknownMessage
 	}
 	
 	@Override
@@ -102,32 +114,11 @@ public class Link<T> implements HierarchicalLevel {
 	 */
 	private ManagementChannel managementChannel;
 	
-	/**
-	 * the current {@link TransparentByteBufGenerator} for inbound packets
-	 */
-	private TransparentByteBufGenerator inTransparentByteBufGenerator = null;
-	/**
-	 * the current {@link TransparentByteBufGenerator} for inbound packets
-	 */
-	private TransparentByteBufGenerator outTransparentByteBufGenerator = null;
+	private PacketCipher inPacketCipher = new PlainPacketCipher();
+	private PacketCipher outPacketCipher = new PlainPacketCipher();
 	
-	/**
-	 * the next (not yet applied) {@link TransparentByteBuf} for outbound headers
-	 */
-	private TransparentByteBuf newOutHeaderTransparentByteBuf = null;
-	/**
-	 * the current {@link TransparentByteBuf} for outbound headers
-	 */
-	private TransparentByteBuf outHeaderTransparentByteBuf = null;
-	
-	/**
-	 * the next (not yet applied) {@link TransparentByteBuf} for inbound headers
-	 */
-	private TransparentByteBuf newInHeaderTransparentByteBuf = null;
-	/**
-	 * the current {@link TransparentByteBuf} for inbound headers
-	 */
-	private TransparentByteBuf inHeaderTransparentByteBuf = null;
+	private Data decryptedPacketData = new Data();
+	private DataByteBuf readDataByteBuf = new DataByteBuf();
 	
 	/**
 	 * a map mapping all {@link ApplicationDataChannel}s to their channel names
@@ -189,6 +180,10 @@ public class Link<T> implements HierarchicalLevel {
 	public HierarchicalLevel getParentHierarchicalLevel() {
 		// TODO
 		return null;
+	}
+	
+	public KeyPair getLinkCryptoInitializationKeyPair() {
+		return onLinkActionListener.getLinkCryptoInitializationKeyPair();
 	}
 	
 	public boolean isInitiator() {
@@ -276,11 +271,11 @@ public class Link<T> implements HierarchicalLevel {
 	
 	/**
 	 * onReceive callback, called when a new packet was received for this link
-	 * @param byteBuf the {@link ByteBuf} containing the packet data
+	 * @param data the {@link ByteBuf} containing the packet data
 	 * @return true if this packet was received successfully, false otherwise
 	 */
 	// no need for synchronization, receiveLinkPacket() locks receiveLock
-	public boolean onReceive(ByteBuf byteBuf) {
+	public boolean onReceive(Data data) {
 		
 		Log.debug(this, "onReceive()");
 		
@@ -289,12 +284,17 @@ public class Link<T> implements HierarchicalLevel {
 		}
 		
 		try {
-			receiveLinkPacket(byteBuf);
+			
+			receiveLinkPacket(data);
+			
 		} catch(ParseException e) {
-			e.printStackTrace();
+			Log.exception(this, e);
 			return false;
 		} catch(BufException e) {
-			e.printStackTrace();
+			Log.exception(this, e);
+			return false;
+		} catch(CryptoException e) {
+			Log.exception(this, e);
 			return false;
 		}
 		
@@ -304,21 +304,20 @@ public class Link<T> implements HierarchicalLevel {
 	
 	/**
 	 * parses the received link packet
-	 * @param byteBuf the {@link ByteBuf} containing the link packet data
+	 * @param data the {@link ByteBuf} containing the link packet data
 	 * @throws ParseException
 	 * @throws BufException
+	 * @throws CryptoException
 	 */
 	// locks receiveLock; called by onReceive() only
-	private void receiveLinkPacket(ByteBuf byteBuf) throws ParseException, BufException {
+	private void receiveLinkPacket(Data data) throws ParseException, BufException, CryptoException {
 		
 		receiveLock.lock();
 		
-		if(inHeaderTransparentByteBuf != null) {
-			inHeaderTransparentByteBuf.setByteBuf(byteBuf);
-			inLinkPacketHeader.read(inHeaderTransparentByteBuf);
-		} else {
-			inLinkPacketHeader.read(byteBuf);
-		}
+		Data decryptedPacketData = inPacketCipher.decrypt(data, this.decryptedPacketData);
+		readDataByteBuf.setData(decryptedPacketData);
+		
+		inLinkPacketHeader.read(readDataByteBuf);
 		
 		long channelId = inLinkPacketHeader.getChannelId().getNum();
 		long dataId = inLinkPacketHeader.getDataId().getNum();
@@ -355,7 +354,7 @@ public class Link<T> implements HierarchicalLevel {
 				Log.msg(this, "channel %s is not open, opening...", channel);
 				channel.open(false);
 			}
-			channel.receiveLinkPacketBody(dataId, channelId, byteBuf, length);
+			channel.receiveLinkPacketBody(dataId, channelId, readDataByteBuf, length);
 		} else {
 			Log.msg(this, "dataId %d: no channel with channelId %d, ignoring", dataId, channelId);
 		}
@@ -370,65 +369,27 @@ public class Link<T> implements HierarchicalLevel {
 	}
 	
 	/**
-	 * sets the {@link TransparentByteBufGenerator} for inbound packets
-	 * @param inTransparentByteBufGenerator the {@link TransparentByteBufGenerator} to use for for inbound packets
-	 */
-	// no need for synchronization
-	public void setInTransparentByteBufGenerator(TransparentByteBufGenerator inTransparentByteBufGenerator) {
-		this.inTransparentByteBufGenerator = inTransparentByteBufGenerator;
-	}
-	
-	/**
-	 * sets the {@link TransparentByteBufGenerator} for outbound packets
-	 * @param inTransparentByteBufGenerator the {@link TransparentByteBufGenerator} to use for for outbound packets
-	 */
-	// no need for synchronization
-	public void setOutTransparentByteBufGenerator(TransparentByteBufGenerator outTransparentByteBufGenerator) {
-		this.outTransparentByteBufGenerator = outTransparentByteBufGenerator;
-	}
-	
-	/**
-	 * sets the next {@link TransparentByteBuf} for outbound packet headers
-	 * @param outHeaderTransparentByteBuf the next {@link TransparentByteBuf} for outbound packet headers
-	 */
-	// no need for synchronization, this does not apply the TransparentByteBuf
-	public void setNewOutHeaderTransparentByteBuf(TransparentByteBuf outHeaderTransparentByteBuf) {
-		Log.debug(this, "new out-header-TransparentByteBuf: %s (not applying yet)", outHeaderTransparentByteBuf);
-		this.newOutHeaderTransparentByteBuf = outHeaderTransparentByteBuf;
-	}
-	
-	/**
-	 * sets the next {@link TransparentByteBuf} for inbound packet headers
-	 * @param inHeaderTransparentByteBuf the next {@link TransparentByteBuf} for inbound packet headers
-	 */
-	// no need for synchronization, this does not apply the TransparentByteBuf
-	public void setNewInHeaderTransparentByteBuf(TransparentByteBuf inHeaderTransparentByteBuf) {
-		Log.debug(this, "new in-header-TransparentByteBuf: %s (not applying yet)", inHeaderTransparentByteBuf);
-		this.newInHeaderTransparentByteBuf = inHeaderTransparentByteBuf;
-	}
-	
-	/**
-	 * applies the next outbound header {@link TransparentByteBuf}
+	 * sets and applies a new outbound {@link PacketCipher}
+	 * @param outPacketCipher the new outbound packet cipher to apply
 	 */
 	// locks sendLock
-	public void applyNewOutHeaderTransparentByteBuf() {
-		Log.debug(this, "applying new out-header-TransparentByteBuf: %s", newOutHeaderTransparentByteBuf);
+	public void applyNewOutPacketCipher(PacketCipher outPacketCipher) {
+		Log.debug(this, "applying new outbound packet cipher: %s", outPacketCipher);
 		sendLock.lock();
-		outHeaderTransparentByteBuf = newOutHeaderTransparentByteBuf;
+		this.outPacketCipher = outPacketCipher;
 		sendLock.unlock();
-		newOutHeaderTransparentByteBuf = null;
 	}
 	
 	/**
-	 * applies the next inbound header {@link TransparentByteBuf}
+	 * sets and applies a new inbound {@link PacketCipher}
+	 * @param inPacketCipher the new inbound packet cipher to apply
 	 */
 	// locks receiveLock
-	public void applyNewInHeaderTransparentByteBuf() {
-		Log.debug(this, "applying new in-header-TransparentByteBuf: %s", newInHeaderTransparentByteBuf);
+	public void applyNewInPacketCipher(PacketCipher inPacketCipher) {
+		Log.debug(this, "applying new inbound packet cipher: %s", inPacketCipher);
 		receiveLock.lock();
-		inHeaderTransparentByteBuf = newInHeaderTransparentByteBuf;
+		this.inPacketCipher = inPacketCipher;
 		receiveLock.unlock();
-		newInHeaderTransparentByteBuf = null;
 	}
 	
 	/**
@@ -458,55 +419,28 @@ public class Link<T> implements HierarchicalLevel {
 	//
 	
 	/**
-	 * writes the header to the given {@link Data} object
+	 * writes the header and the encrypted payload to the given out packet {@link Data} object
 	 * @param dataId the data id for this packet
 	 * @param channelId the channel id of the channel this packet belongs to
-	 * @param channelDataLength the length of the channel data
-	 * @param data the {@link Data} object the header should be written to
-	 * @return the length of the packet header (or in other words, how many bytes have been written)
+	 * @param payloadPacketComponent a {@link PacketComponentI} object containing the payload data
+	 * @param outPacketData the {@link Data} object the header should be written to
 	 * @throws BufException
 	 */
 	// locks sendLock
-	public int writeHeader(long dataId, long channelId, int channelDataLength, Data data) throws BufException {
+	public void writePacket(long dataId, long channelId, PacketComponentI payloadPacketComponent, Data outPacketData) throws BufException, CryptoException {
 		
 		sendLock.lock();
 		
 		outLinkPacketHeader.setDataId(dataId);
 		outLinkPacketHeader.setChannelId(channelId);
-		outLinkPacketHeader.setChannelDataLength(channelDataLength);
-		
-		int linkPacketHeaderLength = outLinkPacketHeader.length();
+		outLinkPacketHeader.setChannelDataLength(payloadPacketComponent.length());
 		
 		Log.debug(this, "sending: %s", outLinkPacketHeader.represent(true));
 		
-		Data prefixData = this.packetPrefixData;
+		outPacketCipher.encrypt(outPacketData, packetPrefixData, outLinkPacketHeader, payloadPacketComponent);
 		this.packetPrefixData = null;
-		if(prefixData != null) {
-			linkPacketHeaderLength += prefixData.length();
-		}
-		data.prepare(linkPacketHeaderLength + channelDataLength);
-		
-		// TODO make this more efficient (i.e. re-use DataByteBuf)
-		ByteBuf byteBuf = new DataByteBuf(data);
-		
-		if(prefixData != null) {
-			byteBuf.write(prefixData);
-		}
-		
-		ByteBuf headerWriteByteBuf;
-		
-		if(outHeaderTransparentByteBuf == null) {
-			headerWriteByteBuf = byteBuf;
-		} else {
-			outHeaderTransparentByteBuf.setByteBuf(byteBuf);
-			headerWriteByteBuf = outHeaderTransparentByteBuf;
-		}
-		
-		outLinkPacketHeader.write(headerWriteByteBuf);
 		
 		sendLock.unlock();
-		
-		return linkPacketHeaderLength;
 	
 	}
 	
@@ -590,7 +524,7 @@ public class Link<T> implements HierarchicalLevel {
 		
 		receiveLock.lock();
 		
-		setStatus(Status.ConnectingActiveConnectRequested);
+		setStatus(Status.ConnectingActive);
 		
 		int channelId = (int)(Math.random() * Integer.MAX_VALUE);
 		
@@ -625,6 +559,10 @@ public class Link<T> implements HierarchicalLevel {
 		
 	}
 	
+	public void abortCryptoInitialization(Exception e) {
+		managementChannel.onAbortCryptoInitialization(e);
+	}
+	
 	/**
 	 * returns a new {@link DataChannel} object for the given protocol identifier and channel id
 	 * @param channelId the channel id of the new {@link DataChannel}
@@ -642,14 +580,6 @@ public class Link<T> implements HierarchicalLevel {
 	 */
 	// no synchronization needed; called from receiveLinkPacket, onOpenChannelRequest and openChannel, which all lock receiveLock, only
 	private void putChannel(Channel channel) {
-		if(outTransparentByteBufGenerator != null) {
-			channel.setNewOutBodyTransparentByteBuf(outTransparentByteBufGenerator.makeLinkPacketBodyTransparentByteBuf());
-			channel.applyNewOutBodyTransparentByteBuf();
-		}
-		if(inTransparentByteBufGenerator != null) {
-			channel.setNewInBodyTransparentByteBuf(inTransparentByteBufGenerator.makeLinkPacketBodyTransparentByteBuf());
-			channel.applyNewInBodyTransparentByteBuf();
-		}
 		if(channel instanceof ApplicationDataChannel) {
 			applicationChannelMap.put(channel.getChannelName(), (ApplicationDataChannel) channel);
 		}

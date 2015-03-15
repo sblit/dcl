@@ -9,6 +9,7 @@ import org.dclayer.net.buf.ByteBuf;
  * a {@link ByteBuf} implementation with an underlying {@link Data}
  */
 public class DataByteBuf extends ByteBuf {
+	
 	/**
 	 * the current position in the {@link Data}
 	 */
@@ -63,7 +64,8 @@ public class DataByteBuf extends ByteBuf {
 	}
 
 	/**
-	 * creates a new {@link DataByteBuf} instance, also creating a byte array to use for the underlying {@link Data}
+	 * creates a new {@link DataByteBuf} instance, creating a new {@link Data} object of the given length to use as underlying data.
+	 * pass {@link Data#GROW} to make the underlying data grow infinitely.
 	 * @param length the length of the byte array to use for the underlying {@link Data}
 	 */
 	public DataByteBuf(int length) {
@@ -93,7 +95,11 @@ public class DataByteBuf extends ByteBuf {
 	 * @param length the length specifying how long the usable area of the byte array is
 	 */
 	public void reset(int offset, int length) {
-		this.data.reset(offset, length);
+		if(this.data != null) {
+			this.data.reset(offset, length);
+		} else if(length > 0) {
+			this.data = new Data(length);
+		}
 		seek(0);
 	}
 	
@@ -138,7 +144,7 @@ public class DataByteBuf extends ByteBuf {
 	 * @param numBytes the amount of bytes to skip
 	 */
 	public void skip(int numBytes) {
-		this.position += numBytes;
+		seek(this.position + numBytes);
 	}
 	
 	/**

@@ -3,13 +3,12 @@ package org.dclayer.net.packetcomponent;
 
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.LinkedList;
 
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.PacketComponentI;
 
-public abstract class AutoPacketComponent<T extends PacketComponentI, U extends AutoPacketComponentChildInfo<T>> extends PacketComponent {
+public abstract class AutoPacketComponent<T extends PacketComponentI, U extends AutoPacketComponentChildInfo<T>> extends ChildPacketComponent {
 	
 	private static class ChildField {
 		
@@ -24,8 +23,6 @@ public abstract class AutoPacketComponent<T extends PacketComponentI, U extends 
 	}
 	
 	//
-	
-	protected int indexInParent = -1;
 	
 	protected final U[] children;
 	
@@ -74,7 +71,9 @@ public abstract class AutoPacketComponent<T extends PacketComponentI, U extends 
 				
 				try {
 					
+					childField.field.setAccessible(true);
 					childField.field.set(this, packetComponent);
+					childField.field.setAccessible(false);
 					
 				} catch (IllegalArgumentException e) {
 					throw new InstantiationError(String.format("AutoPacketComponent %s: Field '%s': Could not assign instance of type %s", this.getClass().getName(), childField.field.getName(), childField.field.getType().getName()));

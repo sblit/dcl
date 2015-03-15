@@ -62,6 +62,8 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	 */
 	private TCPSocket tcpSocket;
 	
+	private KeyPair linkCryptoInitializationKeyPair;
+	
 	private LLACache llaCache = new LLACache();
 	private LLADatabase llaDatabase;
 	
@@ -85,9 +87,13 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 		
 		this.llaDatabase = llaDatabase;
 		
+		Log.debug(this, "generating link crypto initialization keypair...");
+		this.linkCryptoInitializationKeyPair = Crypto.generateLinkCryptoInitRSAKeyPair();
+		Log.debug(this, "done, public key sha1: %s (%d bits)", Crypto.sha1(linkCryptoInitializationKeyPair.getPublicKey().toData()), linkCryptoInitializationKeyPair.getPublicKey().getNumBits());
+		
 		Log.debug(this, "generating address RSA keypair...");
 		KeyPair addressKeyPair = Crypto.generateAddressRSAKeyPair();
-		Log.debug(this, "done, public key: %s (%d bits)", addressKeyPair.getPublicKey().toString(), addressKeyPair.getPublicKey().getNumBits());
+		Log.debug(this, "done, public key sha1: %s (%d bits)", Crypto.sha1(addressKeyPair.getPublicKey().toData()), addressKeyPair.getPublicKey().getNumBits());
 		this.localAddress = new Address<>(addressKeyPair, new NetworkInstanceCollection());
 		
 		onAddress(localAddress);
@@ -402,7 +408,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	}
 	
 	@Override
-	public void onReceiveS2S(InetSocketAddress inetSocketAddress, DataByteBuf dataByteBuf, Data data) {
+	public void onReceiveS2S(InetSocketAddress inetSocketAddress, Data data) {
 		
 		InetAddress inetAddress = inetSocketAddress.getAddress();
 		int port = inetSocketAddress.getPort();
@@ -418,8 +424,6 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 			Result result = preLinkCommunicationManager.permit(inetAddress, port, data);
 			
 			if(result != null) {
-			
-				send(inetSocketAddress, result.echoData);
 				
 				if(result.done) {
 					cachedLLA = llaCache.getIPPortCachedLLA(inetAddress, port, true);
@@ -429,6 +433,8 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 					cachedLLA.setStatus(CachedLLA.CONNECTING_PRELINK);
 					cachedLLA.setFirstLinkPacketPrefixData(result.firstLinkPacketPrefixData);
 				}
+			
+				send(inetSocketAddress, result.echoData);
 				
 			}
 				
@@ -470,7 +476,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 					cachedLLA.setLink(link);
 					cachedLLA.setFirstLinkPacketPrefixData(null);
 					cachedLLA.setStatus(CachedLLA.CONNECTING_LINK);
-					dataByteBuf.skip(prefixData.length());
+					data.relativeReset(prefixData.length());
 					
 				} else {
 					
@@ -487,7 +493,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 		}
 		
 		// normal operation
-		link.onReceive(dataByteBuf);
+		link.onReceive(data);
 		
 	}
 
@@ -535,6 +541,11 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 			Log.debug(this, "link %s is connected, opening interservice channel", link);
 			link.openChannel("org.dclayer.interservice");
 		}
+	}
+
+	@Override
+	public KeyPair getLinkCryptoInitializationKeyPair() {
+		return linkCryptoInitializationKeyPair;
 	}
 
 	@Override

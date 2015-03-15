@@ -1,5 +1,6 @@
 package org.dclayer.net.link;
 
+import org.dclayer.crypto.key.KeyPair;
 import org.dclayer.net.link.channel.data.DataChannel;
 
 /**
@@ -16,4 +17,6 @@ public interface OnLinkActionListener<T> {
 	public DataChannel onOpenChannelRequest(T referenceObject, long channelId, String protocol);
 	
 	public void onLinkStatusChange(T referenceObject, Link.Status oldStatus, Link.Status newStatus);
+	
+	public KeyPair getLinkCryptoInitializationKeyPair();
 }

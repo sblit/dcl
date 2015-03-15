@@ -1,6 +1,7 @@
 package org.dclayer.net.link.channel.data;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.dclayer.exception.crypto.CryptoException;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
@@ -9,13 +10,11 @@ import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.buf.DataByteBuf;
 import org.dclayer.net.buf.ListenerByteBuf;
 import org.dclayer.net.buf.ListenerByteBufInterface;
-import org.dclayer.net.buf.TransparentByteBuf;
 import org.dclayer.net.link.Link;
 import org.dclayer.net.link.channel.Channel;
 import org.dclayer.net.link.channel.component.ChannelDataComponent;
 import org.dclayer.net.link.channel.management.ManagementChannel;
 import org.dclayer.net.link.control.FlowControl;
-import org.dclayer.net.link.control.discontinuousblock.DiscontinuousBlock;
 import org.dclayer.net.link.control.discontinuousblock.DiscontinuousBlockCollection;
 import org.dclayer.net.link.control.idcollection.IdCollection;
 import org.dclayer.net.link.control.packetbackup.PacketBackup;
@@ -62,24 +61,6 @@ public abstract class DataChannel extends Channel implements ListenerByteBufInte
 	private DiscontinuousBlockCollection receivedDiscontinuousBlockCollection = new DiscontinuousBlockCollection(this, 1024);
 	
 	/**
-	 * {@link TransparentByteBuf} for inbound packet bodies
-	 */
-	private TransparentByteBuf inBodyTransparentByteBuf = null;
-	/**
-	 * {@link TransparentByteBuf} for outbound packet bodies
-	 */
-	private TransparentByteBuf outBodyTransparentByteBuf = null;
-	
-	/**
-	 * next {@link TransparentByteBuf} for inbound packet bodies
-	 */
-	private TransparentByteBuf newInBodyTransparentByteBuf = null;
-	/**
-	 * next {@link TransparentByteBuf} for outbound packet bodies
-	 */
-	private TransparentByteBuf newOutBodyTransparentByteBuf = null;
-	
-	/**
 	 * {@link ReentrantLock} locked while receiving
 	 */
 	private ReentrantLock receiveLock = new ReentrantLock();
@@ -87,11 +68,6 @@ public abstract class DataChannel extends Channel implements ListenerByteBufInte
 	 * {@link ReentrantLock} locked while sending
 	 */
 	private ReentrantLock sendLock = new ReentrantLock();
-	
-	/**
-	 * {@link DataByteBuf} used for reading from {@link DiscontinuousBlock}s
-	 */
-	private DataByteBuf dataByteBuf = new DataByteBuf();
 	
 	public DataChannel(Link link, long channelId, String channelName) {
 		super(link, channelId, channelName);
@@ -110,36 +86,6 @@ public abstract class DataChannel extends Channel implements ListenerByteBufInte
 	@Override
 	public IdCollection getReceivedDataIdCollection() {
 		return receivedDataIdCollection;
-	}
-	
-	// no synchronization needed, this does not apply anything
-	@Override
-	public void setNewInBodyTransparentByteBuf(TransparentByteBuf newInBodyTransparentByteBuf) {
-		this.newInBodyTransparentByteBuf = newInBodyTransparentByteBuf;
-	}
-
-	// no synchronization needed, this does not apply anything
-	@Override
-	public void setNewOutBodyTransparentByteBuf(TransparentByteBuf newOutBodyTransparentByteBuf) {
-		this.newOutBodyTransparentByteBuf = newOutBodyTransparentByteBuf;
-	}
-
-	// locks receiveLock
-	@Override
-	public void applyNewInBodyTransparentByteBuf() {
-		receiveLock.lock();
-		this.inBodyTransparentByteBuf = newInBodyTransparentByteBuf;
-		receiveLock.unlock();
-		this.newInBodyTransparentByteBuf = null;
-	}
-
-	// locks sendLock
-	@Override
-	public void applyNewOutBodyTransparentByteBuf() {
-		sendLock.lock();
-		this.outBodyTransparentByteBuf = newOutBodyTransparentByteBuf;
-		sendLock.unlock();
-		this.newOutBodyTransparentByteBuf = null;
 	}
 	
 	// locks receiveLock
@@ -161,7 +107,7 @@ public abstract class DataChannel extends Channel implements ListenerByteBufInte
 			if(receivedDiscontinuousBlockCollection.isEmpty() && (dataIdOffset < 0 || dataId == dataIdOffset)) {
 
 				// the received block is in order, read directly & set dataIdOffset+1
-				readEncrypted(byteBuf, length);
+				read(byteBuf, length);
 				receivedDiscontinuousBlockCollection.setDataIdOffset(dataId + 1);
 
 			} else {
@@ -173,8 +119,7 @@ public abstract class DataChannel extends Channel implements ListenerByteBufInte
 					do {
 
 						Data data = receivedDiscontinuousBlockCollection.clearFirst().getData();
-						dataByteBuf.setData(data);
-						readEncrypted(dataByteBuf, data.length());
+						read(data);
 
 					} while(receivedDiscontinuousBlockCollection.available());
 					
@@ -192,21 +137,19 @@ public abstract class DataChannel extends Channel implements ListenerByteBufInte
 		receiveLock.unlock();
 		
 	}
-
+	
 	/**
-	 * reads the (encrypted) packet body, encrypting it
-	 * @param byteBuf the {@link ByteBuf} holding packet body data
-	 * @param length the length of the packet body data
-	 * @throws BufException
+	 * processes the decrypted packet body data, passing it on to {@link DataChannel#syncPipeByteBuf}
+	 * @param data the {@link Data} holding the decrypted packet body data
 	 */
-	// no need for synchronization, this is called by receivedLinkPacketBody, which locks receiveLock
-	protected void readEncrypted(ByteBuf byteBuf, int length) throws BufException {
-		if(inBodyTransparentByteBuf != null) {
-			inBodyTransparentByteBuf.setByteBuf(byteBuf);
-			this.read(inBodyTransparentByteBuf, length);
-		} else {
-			this.read(byteBuf, length);
+	private void read(Data data) {
+		Log.debug(this, "read(length %d) ...", data.length());
+		try {
+			asyncPipeByteBuf.write(data);
+		} catch(BufException e) {
+			Log.exception(this, e);
 		}
+		Log.debug(this, "... read(length %d) done", data.length());
 	}
 	
 	/**
@@ -230,9 +173,7 @@ public abstract class DataChannel extends Channel implements ListenerByteBufInte
 	 */
 	// locks sendLock
 	protected void send(Data channelData) {
-
-		int channelDataComponentLength = channelData.length();
-
+		
 		sendLock.lock();
 
 		// TODO optimize (remove if, call initDataId() where appropriate)
@@ -245,29 +186,16 @@ public abstract class DataChannel extends Channel implements ListenerByteBufInte
 		PacketBackup packetBackup = sentPacketBackupCollection.put(dataId, getChannelId(), FlowControl.PRIO_DATA);
 		Data data = packetBackup.getPacketProperties().data;
 
-		Log.debug(this, "sending %d bytes", channelDataComponentLength);
-
-		// this will prepare the Data, write the LinkPacketHeader and return the length of the LinkPacketHeader
-		int offset;
+		Log.debug(this, "sending %d bytes", channelData.length());
+		
 		try {
-			offset = getLink().writeHeader(dataId, getChannelId(), channelDataComponentLength, data);
+			getLink().writePacket(dataId, getChannelId(), channelData, data);
 		} catch (BufException e) {
-			e.printStackTrace();
+			Log.exception(this, e);
 			sendLock.unlock();
 			return;
-		}
-
-		ByteBuf linkPacketBodyByteBuf = new DataByteBuf(data, offset);
-
-		if(outBodyTransparentByteBuf != null) {
-			outBodyTransparentByteBuf.setByteBuf(linkPacketBodyByteBuf);
-			linkPacketBodyByteBuf = outBodyTransparentByteBuf;
-		}
-
-		try {
-			linkPacketBodyByteBuf.write(channelData);
-		} catch (BufException e) {
-			e.printStackTrace();
+		} catch (CryptoException e) {
+			Log.exception(this, e);
 			sendLock.unlock();
 			return;
 		}

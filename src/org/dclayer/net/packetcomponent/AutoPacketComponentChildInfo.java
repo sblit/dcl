@@ -38,8 +38,8 @@ public class AutoPacketComponentChildInfo<T extends PacketComponentI> {
 				throw new RuntimeException(String.format("AutoPacketComponent %s: Field '%s': Could not access", field.getName(), object), e);
 			}
 			
-			if(packetComponent instanceof AutoPacketComponent<?, ?>) {
-				((AutoPacketComponent<?, ?>) packetComponent).indexInParent = index;
+			if(packetComponent instanceof ChildPacketComponent) {
+				((ChildPacketComponent) packetComponent).setIndexInParent(index);
 			}
 			
 		}

@@ -84,10 +84,11 @@ public class PacketBackup {
 	
 	@Override
 	public String toString() {
-		return String.format("PacketBackup(dataId=%d, channelId=%d, priority=%d)", 
+		return String.format("PacketBackup(dataId=%d, channelId=%d, priority=%d, numBytes=%d)", 
 				packetProperties.dataId,
 				packetProperties.channelId,
-				flowControlProperties.priority);
+				flowControlProperties.priority,
+				packetProperties.data.length());
 	}
 	
 }

@@ -44,6 +44,22 @@ public class DiscontinuousBlock {
 	}
 	
 	/**
+	 * copies the given data and stores it along with the given data id in this {@link DiscontinuousBlock} object
+	 * @param dataId the data id of the packet
+	 * @param data the data to copy
+	 * @throws BufException
+	 */
+	public void store(long dataId, Data data) throws BufException {
+		this.dataId = dataId;
+		if(this.data == null) {
+			this.data = data.copy();
+		} else {
+			this.data.prepare(data.length());
+			this.data.setBytes(0, data);
+		}
+	}
+	
+	/**
 	 * @return the packet data
 	 */
 	public Data getData() {

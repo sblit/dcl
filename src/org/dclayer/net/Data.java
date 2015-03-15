@@ -47,6 +47,14 @@ public class Data implements PacketComponentI {
 	}
 	
 	/**
+	 * creates a new {@link Data} instance from a given hex string
+	 * @param hexString the data in hexadecimal representation
+	 */
+	public Data(String hexString) {
+		parse(hexString);
+	}
+	
+	/**
 	 * creates a new Data instance, also newly creating the underlying byte array.
 	 * pass {@link Data#GROW} to make this grow infinitely.
 	 * @param length the length for the newly created byte array
@@ -312,7 +320,7 @@ public class Data implements PacketComponentI {
 		if(grow && (index + length) > this.length) {
 			enlarge(index + length);
 		}
-		System.arraycopy(bytes, offset, data, index, length);
+		System.arraycopy(bytes, offset, data, index + this.offset, length);
 	}
 	
 	/**
@@ -342,7 +350,7 @@ public class Data implements PacketComponentI {
 	 * @param offset the position in the given byte array to copy bytes to
 	 */
 	public void getBytes(int index, int length, byte[] bytes, int offset) {
-		System.arraycopy(data, index, bytes, offset, length);
+		System.arraycopy(data, index + this.offset, bytes, offset, length);
 	}
 	
 	@Override

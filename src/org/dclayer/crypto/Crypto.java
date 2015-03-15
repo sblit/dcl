@@ -23,6 +23,9 @@ public class Crypto {
 	public static final int RSA_ADDRESS_KEY_NUMBITS = 2048;
 	public static final int RSA_ADDRESS_KEY_CERTAINTY = 160;
 	
+	public static final int CRYPTO_INIT_KEY_NUMBITS = RSA_ADDRESS_KEY_NUMBITS;
+	public static final int CRYPTO_INIT_KEY_CERTAINTY = RSA_ADDRESS_KEY_CERTAINTY;
+	
 	private static KeyPair<RSAKey> generateRSAKeyPair(int numBits, int certainty) {
 		
 		RSAKeyPairGenerator rsaKeyPairGenerator = new RSAKeyPairGenerator();
@@ -59,6 +62,12 @@ public class Crypto {
 	public static KeyPair<RSAKey> generateAddressRSAKeyPair() {
 		
 		return generateRSAKeyPair(RSA_ADDRESS_KEY_NUMBITS, RSA_ADDRESS_KEY_CERTAINTY);
+		
+	}
+	
+	public static KeyPair<RSAKey> generateLinkCryptoInitRSAKeyPair() {
+		
+		return generateRSAKeyPair(CRYPTO_INIT_KEY_NUMBITS, CRYPTO_INIT_KEY_CERTAINTY);
 		
 	}
 	

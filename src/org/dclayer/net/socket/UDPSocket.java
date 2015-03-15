@@ -41,7 +41,6 @@ public class UDPSocket extends Thread implements HierarchicalLevel {
 	public void run() {
 		
 		Data data = new Data(0xFFFF);
-		DataByteBuf dataByteBuf = new DataByteBuf(data);
 		byte[] buf = data.getData();
 		
 		DatagramPacket p;
@@ -57,9 +56,9 @@ public class UDPSocket extends Thread implements HierarchicalLevel {
 				continue;
 			}
 			
-			Log.debug(this, "received %d bytes from %s", p.getLength(), p.getSocketAddress().toString());
+			data.reset(0, p.getLength());
 			
-			dataByteBuf.reset(0, p.getLength());
+			Log.debug(this, "received %d bytes from %s: %s", data.length(), p.getSocketAddress().toString(), data);
 			
 			InetSocketAddress inetSocketAddress;
 			try {
@@ -68,8 +67,7 @@ public class UDPSocket extends Thread implements HierarchicalLevel {
 				Log.exception(this, e);
 				return;
 			}
-			
-			this.onReceiveListener.onReceiveS2S(inetSocketAddress, dataByteBuf, data);
+			this.onReceiveListener.onReceiveS2S(inetSocketAddress, data);
 			
 		}
 	}
@@ -83,7 +81,7 @@ public class UDPSocket extends Thread implements HierarchicalLevel {
 	public void send(SocketAddress socketAddress, Data data) throws IOException {
 		DatagramPacket p = new DatagramPacket(data.getData(), data.offset(), data.length(), socketAddress);
 		this.socket.send(p);
-		Log.debug(this, "sent %d bytes to %s", p.getLength(), p.getSocketAddress());
+		Log.debug(this, "sent %d bytes to %s: %s", p.getLength(), p.getSocketAddress(), data);
 	}
 	
 	/**
@@ -96,7 +94,7 @@ public class UDPSocket extends Thread implements HierarchicalLevel {
 	public void send(InetAddress inetAddress, int port, Data data) throws IOException {
 		DatagramPacket p = new DatagramPacket(data.getData(), data.offset(), data.length(), inetAddress, port);
 		this.socket.send(p);
-		Log.debug(this, "sent %d bytes to %s:%d", p.getLength(), p.getAddress(), p.getPort());
+		Log.debug(this, "sent %d bytes to %s:%d: %s", p.getLength(), p.getAddress(), p.getPort(), data);
 	}
 
 	@Override

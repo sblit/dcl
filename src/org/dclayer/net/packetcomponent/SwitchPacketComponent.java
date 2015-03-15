@@ -65,18 +65,65 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 			OnReceive onReceiveAnnotation = method.getAnnotation(OnReceive.class);
 			if(onReceiveAnnotation != null) {
 				
-				ChildInfo<T> child = children[onReceiveAnnotation.index()];
-				
 				Class<?>[] parameterTypes = method.getParameterTypes();
-				if(parameterTypes.length != 1
-						|| !parameterTypes[0].isAssignableFrom(child.getField().getType())) {
-					throw new InstantiationError(String.format("Invalid on receive callback method '%s': must accept exactly one parameter of type or supertype of '%s'", method.getName(), child.getField().getType().getSimpleName()));
+				if(parameterTypes.length != 1) {
+					throw new InstantiationError(String.format("Invalid on receive callback method '%s': must accept exactly one parameter", method.getName()));
 				}
 				
-				child.onReceiveMethod = method;
+				if(onReceiveAnnotation.index() < 0) {
+					
+					ChildInfo<T> matchingChild = null;
+					
+					for(ChildInfo<T> child : children) {
+						
+						if(child.onReceiveMethod == method) {
+							
+							throw new InstantiationError(String.format("Invalid on receive callback method '%s': parameter type '%s' matches multiple child packet components", method.getName(), parameterTypes[0].getSimpleName()));
+							
+						} else if(parameterTypes[0].isAssignableFrom(child.getField().getType())) {
+							
+							if(matchingChild != null) {
+								throw new InstantiationError(String.format("Invalid on receive callback method '%s': parameter type '%s' matches multiple child packet components", method.getName(), parameterTypes[0].getSimpleName()));
+							}
+							
+							if(child.onReceiveMethod != null) {
+								throw new InstantiationError(String.format("Invalid on receive callback method '%s': overlaps with method '%s'", method.getName(), child.onReceiveMethod.getName()));
+							}
+							
+							child.onReceiveMethod = method;
+							matchingChild = child;
+							
+							// don't break, finish checking for overlapping methods and children
+							
+						}
+						
+					}
+					
+					if(matchingChild == null) {
+						throw new InstantiationError(String.format("Invalid on receive callback method '%s': no child packet component found that can be cast to '%s'", method.getName(), parameterTypes[0].getSimpleName()));
+					}
+					
+				} else {
+					
+					ChildInfo<T> child = children[onReceiveAnnotation.index()];
+					
+					if(!parameterTypes[0].isAssignableFrom(child.getField().getType())) {
+						throw new InstantiationError(String.format("Invalid on receive callback method '%s': must accept exactly one parameter of type or supertype of '%s'", method.getName(), child.getField().getType().getSimpleName()));
+					}
+					
+					child.onReceiveMethod = method;
+					
+				}
 				
 			}
 			
+		}
+		
+		for(int i = 0; i < children.length; i++) {
+			ChildInfo<T> child = children[i];
+			if(child.onReceiveMethod == null) {
+				throw new InstantiationError(String.format("Invalid on receive object: missing on receive callback method for child type '%s' at index %d", child.getField().getType().getSimpleName(), i));
+			}
 		}
 
 		this.onReceiveObject = onReceiveObject;
@@ -197,11 +244,11 @@ public abstract class SwitchPacketComponent<T extends PacketComponentI> extends 
 		return (activeChild = children[index]).getPacketComponent();
 	}
 	
-	public <W extends AutoPacketComponent<?, ?>> W set(W child) {
-		if(child.indexInParent < 0) {
+	public <W extends ChildPacketComponent> W set(W child) {
+		if(child.getIndexInParent() < 0) {
 			accessChildrenPacketComponents();
 		}
-		set(child.indexInParent);
+		set(child.getIndexInParent());
 		return child;
 	}
 	

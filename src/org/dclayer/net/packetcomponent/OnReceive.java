@@ -10,6 +10,6 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 public @interface OnReceive {
 	
-	int index();
+	int index() default -1;
 
 }

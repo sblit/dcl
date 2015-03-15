@@ -21,7 +21,7 @@ public class FlexNum extends PacketComponent implements NumComponentI {
 	/**
 	 * the amount of bytes this representation requires
 	 */
-	private int length;
+	private int length = 1; // length is one byte if num is 0, which is the case initially
 	
 	/**
 	 * the minimum value for the integer this {@link FlexNum} represents
@@ -86,11 +86,13 @@ public class FlexNum extends PacketComponent implements NumComponentI {
 	}
 	
 	/**
-	 * sets the integer this {@link FlexNum} represents
+	 * sets the integer this {@link FlexNum} represents. does not do
+	 * anything if represented integer already equals given value.
 	 * @param num the integer to represent
 	 */
 	@Override
 	public void setNum(long num) {
+		if(this.num == num) return;
 		this.num = num;
 		length = ByteBuf.getFlexNumLength(this.num);
 	}

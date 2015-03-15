@@ -85,7 +85,7 @@ public class Log {
 	 * @param e the Exception
 	 * @return the stack trace of the given Exception as String
 	 */
-	private static String getStackTraceAsString(Exception e) {
+	public static String getStackTraceAsString(Exception e) {
 		StringWriter sw = new StringWriter();
 		PrintWriter pw = new PrintWriter(sw);
 		e.printStackTrace(pw);

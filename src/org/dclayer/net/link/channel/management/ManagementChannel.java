@@ -4,10 +4,9 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
+import org.dclayer.net.PacketComponentI;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.buf.DataByteBuf;
-import org.dclayer.net.buf.SubByteBuf;
-import org.dclayer.net.buf.TransparentByteBuf;
 import org.dclayer.net.link.Link;
 import org.dclayer.net.link.channel.Channel;
 import org.dclayer.net.link.channel.component.ChannelDataComponent;
@@ -24,15 +23,6 @@ import org.dclayer.net.link.control.packetbackup.UnreliablePacketBackupCollectio
  * an abstract base class for management channel implementations
  */
 public abstract class ManagementChannel extends Channel {
-	
-	/**
-	 * {@link SubByteBuf} used to securely pass the decrypted channel data on to the {@link ManagementChannel#readCommand(DiscontinuousBlock, long, ByteBuf, int)} method
-	 */
-	private SubByteBuf subByteBuf = new SubByteBuf();
-	/**
-	 * {@link DataByteBuf} used for reading from {@link DiscontinuousBlock}s
-	 */
-	private DataByteBuf dataByteBuf = new DataByteBuf();
 	
 	/**
 	 * {@link IdCollection} of all sent data ids
@@ -55,41 +45,7 @@ public abstract class ManagementChannel extends Channel {
 	 */
 	private DiscontinuousBlockCollection receivedDiscontinuousBlockCollection = new DiscontinuousBlockCollection(this, 1024);
 	
-	/**
-	 * {@link TransparentByteBuf} for inbound packet bodies
-	 */
-	private TransparentByteBuf inBodyTransparentByteBuf = null;
-	/**
-	 * {@link TransparentByteBuf} for outbound packet bodies
-	 */
-	private TransparentByteBuf outBodyTransparentByteBuf = null;
-	
-	/**
-	 * next {@link TransparentByteBuf} for inbound packet bodies
-	 */
-	private TransparentByteBuf newInBodyTransparentByteBuf = null;
-	/**
-	 * next {@link TransparentByteBuf} for outbound packet bodies
-	 */
-	private TransparentByteBuf newOutBodyTransparentByteBuf = null;
-	
-	/**
-	 * {@link TransparentByteBuf} for inbound, unreliable packet bodies
-	 */
-	private TransparentByteBuf inUnreliableBodyTransparentByteBuf = null;
-	/**
-	 * {@link TransparentByteBuf} for outbound, unreliable packet bodies
-	 */
-	private TransparentByteBuf outUnreliableBodyTransparentByteBuf = null;
-	
-	/**
-	 * next {@link TransparentByteBuf} for inbound, unreliable packet bodies
-	 */
-	private TransparentByteBuf newInUnreliableBodyTransparentByteBuf = null;
-	/**
-	 * next {@link TransparentByteBuf} for outbound, unreliable packet bodies
-	 */
-	private TransparentByteBuf newOutUnreliableBodyTransparentByteBuf = null;
+	private DataByteBuf readDataByteBuf = new DataByteBuf();
 	
 	/**
 	 * {@link ReentrantLock} locked while receiving
@@ -176,62 +132,6 @@ public abstract class ManagementChannel extends Channel {
 		return null;
 	}
 	
-	// no synchronization needed, this does not apply anything
-	@Override
-	public void setNewInBodyTransparentByteBuf(TransparentByteBuf newInBodyTransparentByteBuf) {
-		this.newInBodyTransparentByteBuf = newInBodyTransparentByteBuf;
-	}
-	
-	// no synchronization needed, this does not apply anything
-	@Override
-	public void setNewOutBodyTransparentByteBuf(TransparentByteBuf newOutBodyTransparentByteBuf) {
-		this.newOutBodyTransparentByteBuf = newOutBodyTransparentByteBuf;
-	}
-	
-	// no synchronization needed, this does not apply anything
-	public void setNewInUnreliableBodyTransparentByteBuf(TransparentByteBuf newInUnreliableBodyTransparentByteBuf) {
-		this.newInUnreliableBodyTransparentByteBuf = newInUnreliableBodyTransparentByteBuf;
-	}
-
-	// no synchronization needed, this does not apply anything
-	public void setNewOutUnreliableBodyTransparentByteBuf(TransparentByteBuf newOutUnreliableBodyTransparentByteBuf) {
-		this.newOutUnreliableBodyTransparentByteBuf = newOutUnreliableBodyTransparentByteBuf;
-	}
-	
-	// locks receiveLock
-	@Override
-	public void applyNewInBodyTransparentByteBuf() {
-		receiveLock.lock();
-		this.inBodyTransparentByteBuf = newInBodyTransparentByteBuf;
-		receiveLock.unlock();
-		this.newInBodyTransparentByteBuf = null;
-	}
-	
-	// locks sendLock
-	@Override
-	public void applyNewOutBodyTransparentByteBuf() {
-		sendLock.lock();
-		this.outBodyTransparentByteBuf = newOutBodyTransparentByteBuf;
-		sendLock.unlock();
-		this.newOutBodyTransparentByteBuf = null;
-	}
-	
-	// locks receiveLock
-	public void applyNewInUnreliableBodyTransparentByteBuf() {
-		receiveLock.lock();
-		this.inUnreliableBodyTransparentByteBuf = newInUnreliableBodyTransparentByteBuf;
-		receiveLock.unlock();
-		this.newInUnreliableBodyTransparentByteBuf = null;
-	}
-	
-	// locks sendLock
-	public void applyNewOutUnreliableBodyTransparentByteBuf() {
-		sendLock.lock();
-		this.outUnreliableBodyTransparentByteBuf = newOutUnreliableBodyTransparentByteBuf;
-		sendLock.unlock();
-		this.newOutUnreliableBodyTransparentByteBuf = null;
-	}
-	
 	// locks receiveLock
 	@Override
 	public void receiveLinkPacketBody(long dataId, long channelId, ByteBuf byteBuf, int length) throws BufException {
@@ -280,11 +180,10 @@ public abstract class ManagementChannel extends Channel {
 
 					long curDataId = receivedDiscontinuousBlockCollection.getDataIdRead();
 					DiscontinuousBlock discontinuousBlock = receivedDiscontinuousBlockCollection.readFirst();
-					DiscontinuousBlock discontinuousBlock2 = receivedDiscontinuousBlockCollection.get(curDataId);
 
-					Log.debug(this, "reading dataId %d (discontinuousBlock=%s, discontinuousBlock2=%s)...", curDataId, discontinuousBlock, discontinuousBlock2);
+					Log.debug(this, "reading dataId %d (discontinuousBlock=%s)...", curDataId, discontinuousBlock);
 
-					readEncrypted(curDataId, discontinuousBlock);
+					read(curDataId, discontinuousBlock);
 
 				} while(receivedDiscontinuousBlockCollection.available());
 
@@ -302,63 +201,33 @@ public abstract class ManagementChannel extends Channel {
 	
 	// no need for synchronization here, this is called inside receiveLinkPacketBody
 	private void receiveUnreliableLinkPacketBody(long dataId, ByteBuf byteBuf, int length) throws BufException {
-
-		subByteBuf.setByteBuf(byteBuf, length);
-		ByteBuf readByteBuf = subByteBuf;
-		if(inUnreliableBodyTransparentByteBuf != null) {
-			inUnreliableBodyTransparentByteBuf.setByteBuf(readByteBuf);
-			readByteBuf = inUnreliableBodyTransparentByteBuf;
-		}
 		
-		readCommand(null, dataId, readByteBuf, length);
+		readCommand(null, dataId, byteBuf);
 		
 	}
 	
 	/**
-	 * reads the (encrypted) packet body, decrypting it
+	 * reads the packet body
 	 * @param byteBuf the {@link ByteBuf} holding packet body data
 	 * @param length the length of the packet body data
 	 * @throws BufException
 	 */
 	// no need for synchronization, this is called by receiveReliableLinkPacketBody, which is called by receiveLinkPacketBody, which locks receiveLock
-	private void readEncrypted(long dataId, DiscontinuousBlock discontinuousBlock) throws BufException {
+	private void read(long dataId, DiscontinuousBlock discontinuousBlock) throws BufException {
 		
 		final Data data = discontinuousBlock.getData();
-		final int length = data.length();
 		
-		dataByteBuf.setData(data);
-		
-		ByteBuf byteBuf;
-		if(inBodyTransparentByteBuf == null) {
-			byteBuf = dataByteBuf;
-		} else {
-			inBodyTransparentByteBuf.setByteBuf(dataByteBuf);
-			byteBuf = inBodyTransparentByteBuf;
-		}
-		
-		subByteBuf.setByteBuf(byteBuf, length);
-		
-		readCommand(discontinuousBlock, dataId, subByteBuf, length);
+		readDataByteBuf.setData(data);
+		readCommand(discontinuousBlock, dataId, readDataByteBuf);
 		
 	}
 	
-	/**
-	 * sends the given {@link ChannelDataComponent}
-	 * @param channelDataComponent the {@link ChannelDataComponent} to send
-	 */
-	protected long send(ChannelDataComponent channelDataComponent) {
-		return send(channelDataComponent, null);
+	protected long send(PacketComponentI payloadPacketComponent) {
+		return send(payloadPacketComponent, null);
 	}
 	
-	/**
-	 * sends the given {@link ChannelDataComponent}
-	 * @param channelDataComponent the {@link ChannelDataComponent} to send
-	 * @param discontinuousBlock the {@link DiscontinuousBlock} of the message this message is a reply to
-	 */
 	// locks sendLock
-	protected long send(ChannelDataComponent channelDataComponent, DiscontinuousBlock discontinuousBlock) {
-		
-		int channelDataComponentLength = channelDataComponent.length();
+	protected long send(PacketComponentI payloadPacketComponent, DiscontinuousBlock discontinuousBlock) {
 		
 		sendLock.lock();
 		
@@ -370,31 +239,14 @@ public abstract class ManagementChannel extends Channel {
 		sentDataIdCollection.add(dataId);
 		
 		PacketBackup packetBackup = sentPacketBackupCollection.put(dataId, getChannelId(), FlowControl.PRIO_MGMT);
-		Data data = packetBackup.getPacketProperties().data;
+		Data outPacketData = packetBackup.getPacketProperties().data;
 		
-		Log.debug(this, "sending (discontinuousBlock=%s): %s", discontinuousBlock, channelDataComponent.represent(true));
-		
-		// this will prepare the Data, write the LinkPacketHeader and return the length of the LinkPacketHeader
-		int offset;
-		try {
-			offset = getLink().writeHeader(dataId, getChannelId(), channelDataComponentLength, data);
-		} catch (BufException e) {
-			e.printStackTrace();
-			sendLock.unlock();
-			return 0;
-		}
-		
-		ByteBuf linkPacketBodyByteBuf = new DataByteBuf(data, offset);
-		
-		if(outBodyTransparentByteBuf != null) {
-			outBodyTransparentByteBuf.setByteBuf(linkPacketBodyByteBuf);
-			linkPacketBodyByteBuf = outBodyTransparentByteBuf;
-		}
+		Log.debug(this, "sending (discontinuousBlock=%s): %s", discontinuousBlock, payloadPacketComponent.represent(true));
 		
 		try {
-			channelDataComponent.write(linkPacketBodyByteBuf);
-		} catch (BufException e) {
-			e.printStackTrace();
+			getLink().writePacket(dataId, getChannelId(), payloadPacketComponent, outPacketData);
+		} catch (Exception e) {
+			Log.exception(this, e);
 			sendLock.unlock();
 			return 0;
 		}
@@ -416,14 +268,11 @@ public abstract class ManagementChannel extends Channel {
 	}
 	
 	/**
-	 * unreliably sends the given {@link ChannelDataComponent}
-	 * @param channelDataComponent the {@link ChannelDataComponent} to send
-	 * @param discontinuousBlock the {@link DiscontinuousBlock} of the message this message is a reply to
+	 * unreliably sends the given {@link PacketComponentI}
+	 * @param payloadPacketComponent the {@link PacketComponentI} to send
 	 */
 	// locks sendLock
-	protected long sendUnreliable(ChannelDataComponent channelDataComponent) {
-		
-		int channelDataComponentLength = channelDataComponent.length();
+	protected long sendUnreliable(PacketComponentI payloadPacketComponent) {
 		
 		sendLock.lock();
 		
@@ -432,29 +281,12 @@ public abstract class ManagementChannel extends Channel {
 		PacketBackup packetBackup = unreliablePacketBackupCollection.get(dataId, getUnreliableChannelId(), FlowControl.PRIO_MGMT);
 		Data data = packetBackup.getPacketProperties().data;
 		
-		Log.debug(this, "sending unreliably: %s", channelDataComponent.represent(true));
-		
-		// this will prepare the Data, write the LinkPacketHeader and return the length of the LinkPacketHeader
-		int offset;
-		try {
-			offset = getLink().writeHeader(dataId, getUnreliableChannelId(), channelDataComponentLength, data);
-		} catch (BufException e) {
-			e.printStackTrace();
-			sendLock.unlock();
-			return 0;
-		}
-		
-		ByteBuf linkPacketBodyByteBuf = new DataByteBuf(data, offset);
-		
-		if(outUnreliableBodyTransparentByteBuf != null) {
-			outUnreliableBodyTransparentByteBuf.setByteBuf(linkPacketBodyByteBuf);
-			linkPacketBodyByteBuf = outUnreliableBodyTransparentByteBuf;
-		}
+		Log.debug(this, "sending unreliably: %s", payloadPacketComponent.represent(true));
 		
 		try {
-			channelDataComponent.write(linkPacketBodyByteBuf);
-		} catch (BufException e) {
-			e.printStackTrace();
+			getLink().writePacket(dataId, getUnreliableChannelId(), payloadPacketComponent, data);
+		} catch (Exception e) {
+			Log.exception(this, e);
 			sendLock.unlock();
 			return 0;
 		}
@@ -513,10 +345,9 @@ public abstract class ManagementChannel extends Channel {
 	 * @param discontinuousBlock the {@link DiscontinuousBlock} of this message
 	 * @param dataId the data id of this message
 	 * @param byteBuf the ByteBuf holding the command
-	 * @param length the length of the command
 	 * @throws BufException
 	 */
-	protected abstract void readCommand(DiscontinuousBlock discontinuousBlock, long dataId, ByteBuf byteBuf, int length) throws BufException;
+	protected abstract void readCommand(DiscontinuousBlock discontinuousBlock, long dataId, ByteBuf byteBuf) throws BufException;
 	/**
 	 * requests a channel opening from the peer
 	 * @param channelId the id of the new channel
@@ -529,6 +360,8 @@ public abstract class ManagementChannel extends Channel {
 	 * link will be killed by the management channel when disconnecting is done
 	 */
 	public abstract void disconnect();
+	
+	public abstract void onAbortCryptoInitialization(Exception e);
 	
 	/**
 	 * reports the existence of a gap in the {@link DiscontinuousBlockCollection} of one of the channels upon packet receipt<br />

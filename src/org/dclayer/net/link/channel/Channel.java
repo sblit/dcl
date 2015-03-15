@@ -3,9 +3,7 @@ import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.buf.ByteBuf;
-import org.dclayer.net.buf.TransparentByteBuf;
 import org.dclayer.net.link.Link;
-import org.dclayer.net.link.Link.CloseReason;
 import org.dclayer.net.link.control.FlowControl;
 import org.dclayer.net.link.control.idcollection.IdCollection;
 import org.dclayer.net.link.control.packetbackup.FlowControlProperties;
@@ -109,11 +107,11 @@ public abstract class Channel implements HierarchicalLevel {
 	 */
 	public abstract void onClose();
 	/**
-	 * called upon receipt of a link packet destined on this channel
+	 * called upon receipt of a link packet destined for this channel
 	 * @param dataId the data id of the link packet
 	 * @param channelId the channel id of the link packet
-	 * @param byteBuf the {@link ByteBuf} holding the link packet body data
-	 * @param length the length of the link packet body data
+	 * @param byteBuf the {@link ByteBuf} to read the packet body bytes from
+	 * @param length the maximum amount of bytes to read from the given {@link ByteBuf}
 	 * @throws BufException
 	 */
 	public abstract void receiveLinkPacketBody(long dataId, long channelId, ByteBuf byteBuf, int length) throws BufException;
@@ -130,24 +128,5 @@ public abstract class Channel implements HierarchicalLevel {
 	 * @return the {@link IdCollection} of received data ids on this channel
 	 */
 	public abstract IdCollection getReceivedDataIdCollection();
-	
-	/**
-	 * sets the next {@link TransparentByteBuf} for inbound packet bodies
-	 * @param inTransparentByteBufGenerator the {@link TransparentByteBuf} for inbound packet bodies
-	 */
-	public abstract void setNewInBodyTransparentByteBuf(TransparentByteBuf newInBodyTransparentByteBuf);
-	/**
-	 * sets the next {@link TransparentByteBuf} for outbound packet bodies
-	 * @param newOutBodyTransparentByteBuf the next {@link TransparentByteBuf} for outbound packet bodies
-	 */
-	public abstract void setNewOutBodyTransparentByteBuf(TransparentByteBuf newOutBodyTransparentByteBuf);
-	/**
-	 * applies the new {@link TransparentByteBuf} for inbound packet bodies
-	 */
-	public abstract void applyNewInBodyTransparentByteBuf();
-	/**
-	 * applies the new {@link TransparentByteBuf} for outbound packet bodies
-	 */
-	public abstract void applyNewOutBodyTransparentByteBuf();
 	
 }
