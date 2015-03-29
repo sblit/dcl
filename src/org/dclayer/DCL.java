@@ -8,13 +8,14 @@ import java.util.LinkedList;
 
 import org.dclayer.crypto.hash.HashAlgorithm;
 import org.dclayer.exception.net.parse.ParseException;
-import org.dclayer.meta.Log;
 import org.dclayer.net.apbr.APBRNetworkType;
 import org.dclayer.net.circle.CircleNetworkType;
-import org.dclayer.net.llacache.InetSocketLLA;
-import org.dclayer.net.llacache.LLA;
-import org.dclayer.net.lladatabase.LLADatabase;
+import org.dclayer.net.lla.InetSocketLLA;
+import org.dclayer.net.lla.LLA;
+import org.dclayer.net.lla.database.LLADatabase;
 import org.dclayer.net.network.NetworkType;
+import org.dclayer.net.socket.TCPSocket;
+import org.dclayer.net.socket.UDPSocket;
 
 public class DCL {
 	
@@ -62,19 +63,6 @@ public class DCL {
 				}
 				break;
 			}
-			case "local": {
-				String[] localParts = argParts[1].split(":");
-				String localHost = localParts[0];
-				int localPort = Integer.parseInt(localParts[1]);
-				System.out.println(String.format("local: host=%s port=%s", localHost, localPort));
-				try {
-					localLLA = new InetSocketLLA((Inet4Address) InetAddress.getByName(localHost), localPort);
-				} catch (UnknownHostException e) {
-					e.printStackTrace();
-					return;
-				}
-				break;
-			}
 			case "apbrnet": {
 				APBRNetworkType apbrNetworkType = new APBRNetworkType(argParts[1]);
 				System.out.println(String.format("will join network %s", apbrNetworkType));
@@ -94,14 +82,18 @@ public class DCL {
 		
 		DCLService service;
 		try {
-			service = new DCLService(s2sPort, a2sPort, llaDatabase);
+			
+			UDPSocket s2sDatagramSocket = new UDPSocket(s2sPort);
+			TCPSocket a2sStreamSocket = new TCPSocket(a2sPort);
+			
+			service = new DCLService(s2sDatagramSocket, a2sStreamSocket, llaDatabase);
+			
+			s2sDatagramSocket.setParentHierarchicalLevel(service);
+			a2sStreamSocket.setParentHierarchicalLevel(service);
+			
 		} catch (IOException e) {
-			Log.fatal(Log.PART_MAIN, e);
+			e.printStackTrace();
 			return;
-		}
-		
-		if(localLLA != null) {
-			service.setLocalLLA(localLLA);
 		}
 		
 		for(NetworkType networkType : networkTypes) {

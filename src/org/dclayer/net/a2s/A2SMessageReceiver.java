@@ -3,7 +3,7 @@ package org.dclayer.net.a2s;
 import org.dclayer.net.Data;
 import org.dclayer.net.component.AbsKeyComponent;
 import org.dclayer.net.componentinterface.AbsKeyComponentI;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 import org.dclayer.net.network.NetworkType;
 
 public interface A2SMessageReceiver {

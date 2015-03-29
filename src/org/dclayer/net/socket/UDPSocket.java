@@ -2,8 +2,6 @@ package org.dclayer.net.socket;
 
 import java.io.IOException;
 import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.SocketException;
@@ -12,28 +10,25 @@ import org.dclayer.listener.net.OnReceiveListener;
 import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
-import org.dclayer.net.buf.DataByteBuf;
 
 /**
  * a UDP Server that provides sending and callback on receive.
  */
-public class UDPSocket extends Thread implements HierarchicalLevel {
+public class UDPSocket extends Thread implements DatagramSocket, HierarchicalLevel {
 	
 	private HierarchicalLevel parentHierarchicalLevel;
 	
 	/**
 	 * the {@link DatagramSocket} to listen on
 	 */
-	private DatagramSocket socket;
+	private java.net.DatagramSocket socket;
 	/**
 	 * the {@link OnReceiveListener} to call upon receipt
 	 */
 	private OnReceiveListener onReceiveListener;
 	
-	public UDPSocket(HierarchicalLevel parentHierarchicalLevel, int port, OnReceiveListener onReceiveListener) throws SocketException {
-		this.parentHierarchicalLevel = parentHierarchicalLevel;
-		this.socket = new DatagramSocket(port);
-		this.onReceiveListener = onReceiveListener;
+	public UDPSocket(int port) throws SocketException {
+		this.socket = new java.net.DatagramSocket(port);
 		this.start();
 	}
 	
@@ -52,7 +47,7 @@ public class UDPSocket extends Thread implements HierarchicalLevel {
 			try {
 				this.socket.receive(p);
 			} catch (IOException e) {
-				Log.exception(Log.PART_NET_UDPSOCKET, this, e);
+				Log.exception(this, e);
 				continue;
 			}
 			
@@ -83,18 +78,14 @@ public class UDPSocket extends Thread implements HierarchicalLevel {
 		this.socket.send(p);
 		Log.debug(this, "sent %d bytes to %s: %s", p.getLength(), p.getSocketAddress(), data);
 	}
+
+	@Override
+	public void setOnReceiveListener(OnReceiveListener onReceiveListener) {
+		this.onReceiveListener = onReceiveListener;
+	}
 	
-	/**
-	 * send the given {@link Data} to the given {@link InetAddress} and port
-	 * @param inetAddress the {@link InetAddress} to send the data to
-	 * @param port the port to send the data to
-	 * @param data the {@link Data} to send
-	 * @throws IOException if sending fails
-	 */
-	public void send(InetAddress inetAddress, int port, Data data) throws IOException {
-		DatagramPacket p = new DatagramPacket(data.getData(), data.offset(), data.length(), inetAddress, port);
-		this.socket.send(p);
-		Log.debug(this, "sent %d bytes to %s:%d: %s", p.getLength(), p.getAddress(), p.getPort(), data);
+	public void setParentHierarchicalLevel(HierarchicalLevel parentHierarchicalLevel) {
+		this.parentHierarchicalLevel = parentHierarchicalLevel;
 	}
 
 	@Override

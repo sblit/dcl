@@ -37,7 +37,7 @@ public class ParentTreeNode<T> extends TreeNode<T> {
 	public T getClosest(Data key, int direction) {
 		final int i = 0xFF & key.getByte(byteOffset);
 		TreeNode<T> child = children[i];
-		if(child == null) {
+		if(child == null || direction != 0) {
 			if(direction > 0) {
 				for(int j = children.length-1; j >= 0; j--) {
 					if(children[j] != null) return children[j].getClosest(key, direction);
@@ -49,19 +49,35 @@ public class ParentTreeNode<T> extends TreeNode<T> {
 				}
 				return null;
 			} else {
-				int min = 0;
-				TreeNode<T> closest = null;
-				for(int j = i+1; j < children.length; j++) {
-					if(children[j] != null) {
-						closest = children[j];
-						min = Math.max(0, i-(j-i));
+				
+				int ci = -1;
+				int min = 0x80;
+				
+				for(int j = 1; j < 0x81; j++) {
+					int k = (i+j) & 0xFF;
+					if(children[k] != null) {
+						ci = k;
+						min = j;
 						break;
 					}
 				}
-				for(int j = i-1; j >= min; j--) {
-					if(children[j] != null) return children[j].getClosest(key, 1);
+				
+				for(int j = 1; j < min; j++) {
+					int k = (i-j) & 0xFF;
+					if(children[k] != null) {
+						ci = k;
+						min = -j;
+						break;
+					}
 				}
-				return closest == null ? null : closest.getClosest(key, -1);
+				
+				if(ci < 0) {
+					return null;
+				}
+				
+				TreeNode<T> closest = children[ci];
+				return closest.getClosest(key, -min);
+				
 			}
 		} else {
 			return child.getClosest(key);

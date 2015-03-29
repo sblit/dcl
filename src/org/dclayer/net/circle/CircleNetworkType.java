@@ -12,11 +12,24 @@ import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
+import org.dclayer.net.network.routing.RouteQuality;
 import org.dclayer.net.network.routing.RoutingTable;
 import org.dclayer.net.network.slot.GenericNetworkSlot;
 
 
 public class CircleNetworkType extends NetworkType<CircleNetworkType> {
+	
+//	public static int byteDist(byte b1, byte b2) {
+//		int n = Math.abs((0xFF & b1) - (0xFF & b2));
+//		return Math.min(n, Byte.MAX_VALUE - n + 1);
+//	}
+	
+	public static long long56Dist(long l1, long l2) {
+		long n = Math.abs(l1 - l2);
+		return Math.min(n, (1L<<56) - n);
+	}
+	
+	//
 	
 	private HashAlgorithm hashAlgorithm;
 	private Hash hash;
@@ -75,6 +88,21 @@ public class CircleNetworkType extends NetworkType<CircleNetworkType> {
 		}
 		
 		return scaledData;
+		
+	}
+	
+	@Override
+	public RouteQuality getRouteQuality(Data fromAddress, Data toAddress) {
+		
+		long from = fromAddress.map(0, fromAddress.length(), 7);
+		long to = toAddress.map(0, toAddress.length(), 7);
+		
+		long dist = long56Dist(from, to);
+		
+		boolean critical = dist <= 2;
+		double quality = 1.0 - (dist / (double)(1L<<55));
+		
+		return new RouteQuality(critical, quality);
 		
 	}
 

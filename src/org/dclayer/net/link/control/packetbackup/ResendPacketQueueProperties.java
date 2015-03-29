@@ -69,7 +69,7 @@ public class ResendPacketQueueProperties extends Properties {
 		this.delayFactor = delayFactor;
 		this.maxAttempts = maxAttempts;
 		this.resendPacketQueue = resendPacketQueue;
-		System.out.println(String.format("PacketBackup(%s).setResend()", this.getPacketBackup()));
+//		System.out.println(String.format("PacketBackup(%s).setResend()", this.getPacketBackup()));
 	}
 	
 	/**
@@ -96,7 +96,7 @@ public class ResendPacketQueueProperties extends Properties {
 	}
 	
 	public void onUsedChange(boolean used) {
-		System.out.println(String.format("PacketBackup(%s).onUsedChange(used=%s)", this.getPacketBackup(), used));
+//		System.out.println(String.format("PacketBackup(%s).onUsedChange(used=%s)", this.getPacketBackup(), used));
 		if(used == false && resendPacketQueue != null) {
 			resendPacketQueue.remove(getPacketBackup());
 			resendPacketQueue = null;
@@ -104,12 +104,12 @@ public class ResendPacketQueueProperties extends Properties {
 	}
 	
 	public void removeFromResendPacketQueueOnUnUsed(ResendPacketQueue resendPacketQueue) {
-		System.out.println(String.format("PacketBackup(%s).removeFromResendPacketQueueOnUnUsed(resendPacketQueue=%s)", this.getPacketBackup(), resendPacketQueue));
+//		System.out.println(String.format("PacketBackup(%s).removeFromResendPacketQueueOnUnUsed(resendPacketQueue=%s)", this.getPacketBackup(), resendPacketQueue));
 		this.resendPacketQueue = resendPacketQueue;
 	}
 	
 	public void onSent() {
-		System.out.println(String.format("PacketBackup(%s).onSent(): resendPacketQueue=%s", this.getPacketBackup(), resendPacketQueue));
+//		System.out.println(String.format("PacketBackup(%s).onSent(): resendPacketQueue=%s", this.getPacketBackup(), resendPacketQueue));
 		if(resendPacketQueue != null) {
 			resendPacketQueue.queue(getPacketBackup());
 		}

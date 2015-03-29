@@ -5,8 +5,11 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketAddress;
+import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.dclayer.PreLinkCommunicationManager.Result;
 import org.dclayer.crypto.Crypto;
@@ -35,10 +38,12 @@ import org.dclayer.net.link.Link.Status;
 import org.dclayer.net.link.LinkSendInterface;
 import org.dclayer.net.link.OnLinkActionListener;
 import org.dclayer.net.link.channel.data.DataChannel;
-import org.dclayer.net.llacache.CachedLLA;
-import org.dclayer.net.llacache.LLA;
-import org.dclayer.net.llacache.LLACache;
-import org.dclayer.net.lladatabase.LLADatabase;
+import org.dclayer.net.lla.CachedLLA;
+import org.dclayer.net.lla.LLA;
+import org.dclayer.net.lla.cache.LLACache;
+import org.dclayer.net.lla.database.LLADatabase;
+import org.dclayer.net.lla.priority.LLAPriority;
+import org.dclayer.net.lla.priority.LLAPriorityAspect;
 import org.dclayer.net.network.ApplicationNetworkInstance;
 import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkInstanceCollection;
@@ -46,21 +51,22 @@ import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
+import org.dclayer.net.network.routing.RouteQuality;
 import org.dclayer.net.network.routing.RoutingTable;
 import org.dclayer.net.network.slot.NetworkSlot;
-import org.dclayer.net.socket.TCPSocket;
-import org.dclayer.net.socket.UDPSocket;
+import org.dclayer.net.socket.DatagramSocket;
+import org.dclayer.net.socket.StreamSocket;
 
 public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnReceiveListener, NetworkInstanceListener, ApplicationConnectionActionListener, LinkSendInterface<CachedLLA>, OnLinkActionListener<CachedLLA>, InterserviceChannelActionListener, HierarchicalLevel {
 	
 	/**
-	 * local UDPSocket, used for Service-to-Service communication
+	 * local DatagramSocket, used for Service-to-Service communication
 	 */
-	private UDPSocket udpSocket;
+	private DatagramSocket s2sDatagramSocket;
 	/**
-	 * local TCPSocket, used for Application-to-Service communication
+	 * local StreamSocket, used for Application-to-Service communication
 	 */
-	private TCPSocket tcpSocket;
+	private StreamSocket a2sStreamSocket;
 	
 	private KeyPair linkCryptoInitializationKeyPair;
 	
@@ -73,7 +79,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	
 	private PreLinkCommunicationManager preLinkCommunicationManager = new PreLinkCommunicationManager(this);
 	
-	private ConnectionInitiationManager connectionInitiationManager;
+	private ConnectionManager connectionManager;
 	
 	private List<InterserviceChannel> interserviceChannels = new LinkedList<>();
 	private List<NetworkNode> networkNodes = new LinkedList<>();
@@ -81,9 +87,10 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	private DataByteBuf networkPayloadDataByteBuf = new DataByteBuf();
 	private CrispPacket inCrispPacket = new CrispPacket();
 	
-	private LLA localLLA; // TODO remove
+	private HashMap<LLA, AtomicInteger> localLLAReports = new HashMap<>();
+	private LLA localLLA;
 	
-	public DCLService(int s2sPort, int a2sPort, LLADatabase llaDatabase) throws IOException {
+	public DCLService(DatagramSocket s2sDatagramSocket, StreamSocket a2sStreamSocket, LLADatabase llaDatabase) throws IOException {
 		
 		this.llaDatabase = llaDatabase;
 		
@@ -98,10 +105,14 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 		
 		onAddress(localAddress);
 		
-		udpSocket = new UDPSocket(this, s2sPort, this);
-		tcpSocket = new TCPSocket(a2sPort, this);
+		s2sDatagramSocket.setOnReceiveListener(this);
+		a2sStreamSocket.setApplicationConnectionActionListener(this);
 		
-		this.connectionInitiationManager = new ConnectionInitiationManager(this);
+		this.s2sDatagramSocket = s2sDatagramSocket;
+		this.a2sStreamSocket = a2sStreamSocket;
+		
+		this.connectionManager = new ConnectionManager(this, llaDatabase);
+		llaCache.setCachedLLAStatusListener(connectionManager);
 		
 	}
 	
@@ -113,24 +124,30 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 		return llaCache;
 	}
 	
-	// TODO remove!
-	public List<LLA> getLLAs() {
-		return llaDatabase.getLLAs();
+	/**
+	 * @deprecated Only for use with JUnit test cases
+	 */
+	@Deprecated
+	public ConnectionManager getConnectionManager() {
+		return connectionManager;
 	}
 	
 	public void storeLLAs(List<LLA> llas) {
 		llaDatabase.store(llas);
 	}
+	
+	public void storeLLAs(List<LLA> llas, CachedLLA originCachedLLA) {
+		// TODO remember originCachedLLA for NAT traversal
+		storeLLAs(llas);
+	}
+	
+	public List<LLA> getRandomConnectedLLAs(int limit) {
+		return connectionManager.getRandomConnectedLLAs(limit);
+	}
 
 	@Override
 	public LLA getLocalLLA() {
-		// TODO
 		return localLLA;
-	}
-	
-	// TODO remove
-	public void setLocalLLA(LLA localLLA) {
-		this.localLLA = localLLA;
 	}
 	
 	@Override
@@ -206,12 +223,12 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	}
 	
 	@Override
-	public void onNewRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode remoteNetworkNode, NetworkSlot localNetworkSlot) {
+	public synchronized void onNewRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode remoteNetworkNode, NetworkSlot localNetworkSlot) {
 		
 		// TODO also check if we should maybe join that network
 		
 		// just use the first network instance with the same network type (as they are all connected anyways)
-		NetworkInstance localNetworkInstance = networkInstanceCollection.findLocal(remoteNetworkNode.getNetworkType());
+		NetworkInstance localNetworkInstance = networkInstanceCollection.findFirst(remoteNetworkNode.getNetworkType());
 		
 		if(localNetworkInstance != null) {
 			
@@ -220,7 +237,24 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 			
 			if(added) {
 				
-				Log.debug(this, "added %s to routing table for %s", remoteNetworkNode, localNetworkInstance);
+				Log.debug(this, "added %s to routing table for %s (and all other local network instances with network type %s)", remoteNetworkNode, localNetworkInstance, localNetworkInstance.getNetworkType());
+				
+				for(NetworkInstance networkInstance : networkInstanceCollection.findAll(remoteNetworkNode.getNetworkType())) {
+					
+					RouteQuality routeQuality = networkInstance.getNetworkType().getRouteQuality(networkInstance.getScaledAddress(), remoteNetworkNode.getScaledAddress());
+					if(routeQuality == null) continue;
+					
+					LLAPriorityAspect llaPriorityAspect = interserviceChannel.getCachedLLA().addLLAPriorityAspect(LLAPriority.Type.ROUTING, networkInstance, remoteNetworkNode.getScaledAddress().toString());
+					
+					llaPriorityAspect.setLock(routeQuality.critical);
+					llaPriorityAspect.update(routeQuality.quality);
+					
+					networkInstance.addLLAPriorityAspect(llaPriorityAspect);
+					remoteNetworkNode.addLLAPriorityAspect(llaPriorityAspect);
+					
+					// TODO: drop LLAPriorityAspects when network instance is removed!
+					
+				}
 				
 			}
 			
@@ -229,9 +263,9 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	}
 	
 	@Override
-	public void onRemoveRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode remoteNetworkNode) {
+	public synchronized void onRemoveRemoteNetworkNode(InterserviceChannel interserviceChannel, NetworkNode remoteNetworkNode) {
 		
-		NetworkInstance localNetworkInstance = networkInstanceCollection.findLocal(remoteNetworkNode.getNetworkType());
+		NetworkInstance localNetworkInstance = networkInstanceCollection.findFirst(remoteNetworkNode.getNetworkType());
 		
 		if(localNetworkInstance != null) {
 			
@@ -242,6 +276,8 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 				
 				Log.debug(this, "removed %s from routing table for %s", remoteNetworkNode, localNetworkInstance);
 				
+				remoteNetworkNode.dropLLAPriorityAspects();
+				
 			}
 			
 		}
@@ -250,7 +286,42 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	
 	@Override
 	public void onInterserviceChannelClosed(InterserviceChannel interserviceChannel) {
-		// TODO take action
+		interserviceChannel.getCachedLLA().setStatus(CachedLLA.DISCONNECTED);
+		// TODO
+	}
+	
+	@Override
+	public void onLocalLLAReport(InterserviceChannel interserviceChannel, LLA oldLocalLLA, LLA newLocalLLA) {
+		synchronized(localLLAReports) {
+			
+			if(oldLocalLLA != null) {
+				AtomicInteger i = localLLAReports.get(oldLocalLLA);
+				if(i.decrementAndGet() <= 0) {
+					localLLAReports.remove(oldLocalLLA);
+				}
+			}
+			
+			AtomicInteger i = localLLAReports.get(newLocalLLA);
+			if(i == null) {
+				i = new AtomicInteger(0);
+				localLLAReports.put(newLocalLLA, i);
+			}
+			i.incrementAndGet();
+			
+			int maxCount = 0;
+			LLA maxLLA = null;
+			for(Map.Entry<LLA, AtomicInteger> entry : localLLAReports.entrySet()) {
+				if(entry.getValue().get() > maxCount) {
+					maxCount = entry.getValue().get();
+					maxLLA = entry.getKey();
+				}
+			}
+			
+			localLLA = maxLLA;
+			
+			Log.debug(this, "local LLA is %s (map updated due to transition from %s to %s by remote %s: %s)", localLLA, oldLocalLLA, newLocalLLA, interserviceChannel.getCachedLLA(), localLLAReports.toString());
+			
+		}
 	}
 	
 	@Override
@@ -333,24 +404,25 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	//
 	
 	public void connect(CachedLLA cachedLLA) {
-		connectionInitiationManager.connect(cachedLLA);
+		connectionManager.connect(cachedLLA);
 	}
 	
 	@Override
 	public synchronized void connect(LLA lla, InterservicePolicy interservicePolicy) {
-		// TODO: do not connect if we're connected already
+		
 		CachedLLA cachedLLA = getLLACache().getCachedLLA(lla, true);
+		if(!cachedLLA.disconnected()) return; // do not connect if we're connected/connecting already
+		
 		cachedLLA.setInterservicePolicy(interservicePolicy);
+		
 		connect(cachedLLA);
+		
 	}
 	
 	public void connect(LLA lla) {
 		connect(lla, makeDefaultInterservicePolicy());
 	}
 	
-	/**
-	 * sends a packet to the given LLA in order to punch a hole in a local NAT
-	 */
 	@Override
 	public synchronized void prepareForIncomingApplicationChannel(LLA lla, ApplicationNetworkInstance applicationNetworkInstance, ApplicationChannel applicationChannel, Data punchData) {
 		
@@ -365,7 +437,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 		addDefaultIncomingApplicationChannelInterservicePolicyRules(interservicePolicy, applicationNetworkInstance, applicationChannel, lla);
 		
 		if(cachedLLA.disconnected()) {
-			connectionInitiationManager.punch(cachedLLA, punchData);
+			connectionManager.punch(cachedLLA, punchData);
 		}
 		
 	}
@@ -427,9 +499,6 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 				
 				if(result.done) {
 					cachedLLA = llaCache.getIPPortCachedLLA(inetAddress, port, true);
-					if(cachedLLA.getInterservicePolicy() == null) {
-						cachedLLA.setInterservicePolicy(makeDefaultInterservicePolicy());
-					}
 					cachedLLA.setStatus(CachedLLA.CONNECTING_PRELINK);
 					cachedLLA.setFirstLinkPacketPrefixData(result.firstLinkPacketPrefixData);
 				}
@@ -452,10 +521,21 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 				}
 			
 				// we're connecting via pre-link communication
+				
+				if(cachedLLA.getPunchData() != null && cachedLLA.getPunchData().equals(data)) {
+					// we've received the same data as we sent
+					// either the remote is echoing our data, or we're trying to connect to ourselves
+					Log.debug(this, "seems like I'm talking to myself, aborting connection to %s", cachedLLA);
+					cachedLLA.setPunchData(null);
+					cachedLLA.setStatus(CachedLLA.DISCONNECTED);
+					return;
+				}
+				
 				Result result = preLinkCommunicationManager.echo(data);
 				if(result.done) {
-					cachedLLA.setLink(link = new Link<CachedLLA>(this, this, cachedLLA));
+					cachedLLA.setLink(link = new Link<CachedLLA>(this, this, cachedLLA, this));
 					cachedLLA.setStatus(CachedLLA.CONNECTING_LINK);
+					cachedLLA.setPunchData(null);
 					link.connect(result.firstLinkPacketPrefixData);
 					return;
 				}
@@ -472,7 +552,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 				
 					// the first link packet is prefixed with the expected data
 					// -> create the link and feed it the rest (the latter happens at the bottom of this method)
-					link = new Link<CachedLLA>(this, this, cachedLLA);
+					link = new Link<CachedLLA>(this, this, cachedLLA, this);
 					cachedLLA.setLink(link);
 					cachedLLA.setFirstLinkPacketPrefixData(null);
 					cachedLLA.setStatus(CachedLLA.CONNECTING_LINK);
@@ -508,7 +588,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	
 	private void send(SocketAddress inetSocketAddress, Data data) {
 		try {
-			udpSocket.send(inetSocketAddress, data);
+			s2sDatagramSocket.send(inetSocketAddress, data);
 		} catch (IOException e) {
 			Log.exception(this, e, "Exception while sending link packet to %s", inetSocketAddress);
 			return;
@@ -517,10 +597,18 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 
 	@Override
 	public DataChannel onOpenChannelRequest(CachedLLA cachedLLA, long channelId, String protocol) {
+		
 		switch(protocol) {
 		case "org.dclayer.interservice": {
+			
 			cachedLLA.setStatus(CachedLLA.CONNECTING_CHANNEL);
+			
+			if(cachedLLA.getInterservicePolicy() == null) {
+				cachedLLA.setInterservicePolicy(makeDefaultInterservicePolicy());
+			}
+			
 			InterserviceChannel interserviceChannel = new InterserviceChannel(this, this, cachedLLA, channelId, protocol);
+			
 			synchronized(this) {
 				interserviceChannels.add(interserviceChannel);
 				for(NetworkNode networkNode : networkInstanceCollection) {
@@ -528,10 +616,14 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 				}
 				cachedLLA.setInterserviceChannel(interserviceChannel);
 			}
+			
 			return interserviceChannel;
+			
 		}
 		}
+		
 		return null;
+		
 	}
 
 	@Override

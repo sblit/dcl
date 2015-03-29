@@ -1,8 +1,11 @@
 package org.dclayer.net.network;
 
+import java.util.LinkedList;
+
 import org.dclayer.net.Data;
 import org.dclayer.net.address.Address;
 import org.dclayer.net.crisp.CrispPacket;
+import org.dclayer.net.lla.priority.LLAPriorityAspect;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
@@ -15,6 +18,8 @@ public abstract class NetworkNode<T> implements ForwardDestination<T> {
 	private Address address;
 	
 	private Data scaledAddress;
+	
+	private LinkedList<LLAPriorityAspect> llaPriorityAspects;
 	
 	private T identifierObject;
 	
@@ -77,6 +82,40 @@ public abstract class NetworkNode<T> implements ForwardDestination<T> {
 	
 	public final boolean isEndpoint() {
 		return endpoint;
+	}
+	
+	private void ensureLLAPriorityAspects() {
+		if(llaPriorityAspects == null) {
+			synchronized(this) {
+				if(llaPriorityAspects == null) {
+					llaPriorityAspects = new LinkedList<LLAPriorityAspect>();
+				}
+			}
+		}
+	}
+	
+	public void addLLAPriorityAspect(LLAPriorityAspect llaPriorityAspect) {
+		ensureLLAPriorityAspects();
+		synchronized (llaPriorityAspects) {
+			llaPriorityAspect.addTo(llaPriorityAspects);
+		}
+	}
+	
+	public Iterable<LLAPriorityAspect> getLLAPriorityAspectsIterator() {
+		ensureLLAPriorityAspects();
+		return llaPriorityAspects;
+	}
+	
+	public void dropLLAPriorityAspects() {
+		if(llaPriorityAspects == null) {
+			return;
+		}
+		synchronized (llaPriorityAspects) {
+			for(LLAPriorityAspect llaPriorityAspect : llaPriorityAspects) {
+				llaPriorityAspect.dropExcept(llaPriorityAspects);
+			}
+			llaPriorityAspects.clear();
+		}
 	}
 	
 	@Override

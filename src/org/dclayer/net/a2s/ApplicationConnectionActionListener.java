@@ -7,7 +7,7 @@ import org.dclayer.net.Data;
 import org.dclayer.net.address.Address;
 import org.dclayer.net.applicationchannel.ApplicationChannel;
 import org.dclayer.net.interservice.InterservicePolicy;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 import org.dclayer.net.network.ApplicationNetworkInstance;
 import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.component.NetworkPayload;

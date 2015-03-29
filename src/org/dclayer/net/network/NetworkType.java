@@ -13,6 +13,7 @@ import org.dclayer.net.circle.CircleNetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
+import org.dclayer.net.network.routing.RouteQuality;
 import org.dclayer.net.network.routing.RoutingTable;
 import org.dclayer.net.network.slot.GenericNetworkSlot;
 
@@ -91,6 +92,8 @@ public abstract class NetworkType<T extends NetworkType> extends PacketComponent
 	
 	public abstract Data scaleAddress(Address address);
 	public abstract int getAddressNumBytes();
+	
+	public abstract RouteQuality getRouteQuality(Data fromAddress, Data toAddress);
 	
 	public abstract RoutingTable makeRoutingTable(NetworkInstance networkInstance);
 	public abstract NetworkPacket makeNetworkPacket(GenericNetworkSlot<NetworkNode> networkSlot);

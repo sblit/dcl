@@ -292,6 +292,7 @@ public class Data implements PacketComponentI {
 	 * @return the byte at index
 	 */
 	public byte getByte(int index) {
+		if(index < 0) index += length;
 		return this.data[offset + index];
 	}
 	
@@ -353,6 +354,16 @@ public class Data implements PacketComponentI {
 		System.arraycopy(data, index + this.offset, bytes, offset, length);
 	}
 	
+	public long getBytes(int offset, int length) {
+		if(offset < 0) offset += this.length;
+		long bytes = 0;
+		for(int i = 0; i < length; i++) {
+			bytes <<= 8;
+			bytes |= (0xFF & this.data[i+this.offset+offset]);
+		}
+		return bytes;
+	}
+	
 	@Override
 	public boolean equals(Object object) {
 		if(object == this) return true;
@@ -375,6 +386,16 @@ public class Data implements PacketComponentI {
 			}
 		}
 		return true;
+	}
+	
+	public long map(int thisOffset, int length, int mapBytes) {
+		long dist = 0;
+		for(int i = 0; i < length; i++) {
+			int cShift = (length-i-1)*8*mapBytes/length;
+			int nBits = (length-i)*8*mapBytes/length - cShift;
+			dist |= (((0xFFL & this.data[i+this.offset+thisOffset]) >> Math.max(0, 8-nBits)) << (cShift - Math.min(0, 8-nBits)));
+		}
+		return dist;
 	}
 	
 	@Override

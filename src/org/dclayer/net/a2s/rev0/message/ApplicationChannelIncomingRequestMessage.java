@@ -12,7 +12,7 @@ import org.dclayer.net.component.DataComponent;
 import org.dclayer.net.component.FlexNum;
 import org.dclayer.net.component.KeyComponent;
 import org.dclayer.net.componentinterface.DataComponentI;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 
 public class ApplicationChannelIncomingRequestMessage extends A2SRevisionSpecificMessage implements ApplicationChannelIncomingRequestMessageI {
 	

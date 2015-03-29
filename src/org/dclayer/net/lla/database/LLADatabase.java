@@ -1,25 +1,30 @@
-package org.dclayer.net.lladatabase;
+package org.dclayer.net.lla.database;
 
-import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 
 import org.dclayer.exception.net.buf.BufException;
 import org.dclayer.exception.net.parse.ParseException;
+import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
 import org.dclayer.net.buf.DataByteBuf;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 
 /**
  * Database for permanently storing lower-level addresses
  * @author Martin Exner
  */
-public class LLADatabase {
+public class LLADatabase implements HierarchicalLevel {
+	
+	public static class LLADatabaseCursor {
+		private int index = 0;
+	}
 	
 	// TODO implement this properly
 	
-	private HashSet<Data> llaDatas = new HashSet<Data>();
+	private ArrayList<Data> llaDatas = new ArrayList<>();
 	
 	/**
 	 * permanently stores the given LLA (having it serialized first, thus not storing the LLA object itself)
@@ -40,20 +45,46 @@ public class LLADatabase {
 		}
 	}
 	
-	public synchronized List<LLA> getLLAs() {
-		List<LLA> llas = new LinkedList<LLA>();
+	public synchronized List<LLA> getLLAs(LLADatabaseCursor cursor, int limit) {
+		
+		LinkedList<LLA> llas = new LinkedList<>();
+		
 		DataByteBuf dataByteBuf = new DataByteBuf();
-		for(Data data : llaDatas) {
+		for(int i = 0; i < limit && cursor.index < llaDatas.size();) {
+			
+			Data data = llaDatas.get(cursor.index++);
 			dataByteBuf.setData(data);
+			
 			try {
 				llas.add(LLA.fromByteBuf(dataByteBuf));
 			} catch (BufException e) {
 				Log.exception(this, e);
+				continue;
 			} catch (ParseException e) {
 				Log.exception(this, e);
+				continue;
 			}
+			
+			i++;
+			
 		}
+		
 		return llas;
+		
+	}
+	
+	public LLADatabaseCursor makeCursor() {
+		return new LLADatabaseCursor();
+	}
+	
+	@Override
+	public HierarchicalLevel getParentHierarchicalLevel() {
+		return null;
+	}
+	
+	@Override
+	public String toString() {
+		return "LLADatabase";
 	}
 	
 }

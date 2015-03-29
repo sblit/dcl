@@ -6,24 +6,24 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 
+import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
-import org.dclayer.net.a2s.ApplicationConnection;
 import org.dclayer.net.a2s.ApplicationConnectionActionListener;
 
 /**
  * A TCP Server that provides sending and callback on receive.
  */
-public class TCPSocket extends Thread {
+public class TCPSocket extends Thread implements StreamSocket, HierarchicalLevel {
 	/**
 	 * the {@link ServerSocket} to listen on
 	 */
 	private ServerSocket serverSocket;
 	private ApplicationConnectionActionListener applicationConnectionActionListener;
+	private HierarchicalLevel parentHierarchicalLevel;
 	
-	public TCPSocket(int port, ApplicationConnectionActionListener applicationConnectionActionListener) throws IOException {
+	public TCPSocket(int port) throws IOException {
 		this.serverSocket = new ServerSocket();
 		this.serverSocket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
-		this.applicationConnectionActionListener = applicationConnectionActionListener;
 		this.start();
 	}
 	
@@ -35,14 +35,29 @@ public class TCPSocket extends Thread {
 			try {
 				connectionSocket = serverSocket.accept();
 			} catch (IOException e) {
-				Log.exception(Log.PART_NET_TCPSOCKET, this, e);
+				Log.exception(this, e);
 				continue;
 			}
 			
-			Log.debug(Log.PART_NET_TCPSOCKET, this, String.format("new connection from %s:%d", connectionSocket.getInetAddress().toString(), connectionSocket.getPort()));
+			Log.debug(this, "new connection from %s:%d", connectionSocket.getInetAddress().toString(), connectionSocket.getPort());
 			
-			ApplicationConnection applicationConnection = applicationConnectionActionListener.onApplicationConnection(connectionSocket);
+			applicationConnectionActionListener.onApplicationConnection(connectionSocket);
 			
 		}
 	}
+
+	@Override
+	public void setApplicationConnectionActionListener(ApplicationConnectionActionListener applicationConnectionActionListener) {
+		this.applicationConnectionActionListener = applicationConnectionActionListener;
+	}
+
+	@Override
+	public HierarchicalLevel getParentHierarchicalLevel() {
+		return parentHierarchicalLevel;
+	}
+	
+	public void setParentHierarchicalLevel(HierarchicalLevel parentHierarchicalLevel) {
+		this.parentHierarchicalLevel = parentHierarchicalLevel;
+	}
+	
 }

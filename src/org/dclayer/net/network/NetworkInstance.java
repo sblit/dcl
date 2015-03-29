@@ -5,7 +5,7 @@ import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.meta.Log;
 import org.dclayer.net.Data;
 import org.dclayer.net.address.Address;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.routing.Nexthops;
 import org.dclayer.net.network.routing.RoutingTable;

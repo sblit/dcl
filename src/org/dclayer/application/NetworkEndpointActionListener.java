@@ -4,7 +4,7 @@ import org.dclayer.application.applicationchannel.ApplicationChannelActionListen
 import org.dclayer.application.networktypeslotmap.NetworkEndpointSlot;
 import org.dclayer.crypto.key.Key;
 import org.dclayer.net.Data;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 
 public interface NetworkEndpointActionListener {
 

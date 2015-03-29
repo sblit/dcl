@@ -95,6 +95,8 @@ public class Link<T> implements HierarchicalLevel {
 		return String.format("Link@%x", System.identityHashCode(this));
 	}
 	
+	private HierarchicalLevel parentHierarchicalLevel;
+	
 	/**
 	 * An {@link OnLinkActionListener} called upon opening of a new channel
 	 */
@@ -169,17 +171,17 @@ public class Link<T> implements HierarchicalLevel {
 	 * @param linkSendInterface the {@link LinkSendInterface} to use
 	 * @param onOpenChannelRequestListener the {@link OnLinkActionListener} to use
 	 */
-	public Link(LinkSendInterface<T> linkSendInterface, OnLinkActionListener<T> onOpenChannelRequestListener, T referenceObject) {
+	public Link(LinkSendInterface<T> linkSendInterface, OnLinkActionListener<T> onOpenChannelRequestListener, T referenceObject, HierarchicalLevel parentHierarchicalLevel) {
 		this.linkSendInterface = linkSendInterface;
 		this.flowControl = new FlowControl(this);
 		this.onLinkActionListener = onOpenChannelRequestListener;
 		this.referenceObject = referenceObject;
+		this.parentHierarchicalLevel = parentHierarchicalLevel;
 	}
 
 	@Override
 	public HierarchicalLevel getParentHierarchicalLevel() {
-		// TODO
-		return null;
+		return parentHierarchicalLevel;
 	}
 	
 	public KeyPair getLinkCryptoInitializationKeyPair() {

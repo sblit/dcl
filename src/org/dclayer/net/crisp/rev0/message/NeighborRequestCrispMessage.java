@@ -11,7 +11,7 @@ import org.dclayer.net.crisp.CrispMessage;
 import org.dclayer.net.crisp.CrispMessageReceiver;
 import org.dclayer.net.crisp.CrispPacket;
 import org.dclayer.net.crisp.message.NeighborRequestCrispMessageI;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 
 public class NeighborRequestCrispMessage extends EncryptionKeySignedPacketComponent implements NeighborRequestCrispMessageI, CrispMessage {
 	

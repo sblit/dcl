@@ -7,7 +7,7 @@ import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.interservice.InterserviceMessage;
 import org.dclayer.net.interservice.InterservicePacket;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 
 public class IntegrationConnectRequestInterserviceMessage extends InterserviceMessage {
 	

@@ -2,7 +2,7 @@ package org.dclayer.net.crisp.message;
 
 import org.dclayer.net.componentinterface.DataComponentI;
 import org.dclayer.net.componentinterface.KeyEncryptedPacketComponentI;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 
 public interface NeighborRequestCrispMessageI extends KeyEncryptedPacketComponentI {
 

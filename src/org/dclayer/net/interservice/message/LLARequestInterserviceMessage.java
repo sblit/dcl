@@ -42,8 +42,8 @@ public class LLARequestInterserviceMessage extends InterserviceMessage {
 		return limit.getNum();
 	}
 	
-	public void setLimit(long version) {
-		this.limit.setNum(version);
+	public void setLimit(long limit) {
+		this.limit.setNum(limit);
 	}
 
 	@Override

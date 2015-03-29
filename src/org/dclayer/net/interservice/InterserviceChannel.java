@@ -1,5 +1,6 @@
 package org.dclayer.net.interservice;
 
+import java.util.Arrays;
 import java.util.List;
 
 import org.dclayer.DCLService;
@@ -26,20 +27,20 @@ import org.dclayer.net.interservice.message.ApplicationChannelSlotAssignInterser
 import org.dclayer.net.interservice.message.ConnectionbaseNoticeInterserviceMessage;
 import org.dclayer.net.interservice.message.CryptoChallengeReplyInterserviceMessage;
 import org.dclayer.net.interservice.message.CryptoChallengeRequestInterserviceMessage;
-import org.dclayer.net.interservice.message.GroupMemberLLAReplyInterserviceMessage;
-import org.dclayer.net.interservice.message.GroupMemberLLARequestInterserviceMessage;
 import org.dclayer.net.interservice.message.IntegrationConnectRequestInterserviceMessage;
 import org.dclayer.net.interservice.message.IntegrationRequestInterserviceMessage;
 import org.dclayer.net.interservice.message.LLAReplyInterserviceMessage;
 import org.dclayer.net.interservice.message.LLARequestInterserviceMessage;
+import org.dclayer.net.interservice.message.LocalLLAReplyInterserviceMessage;
+import org.dclayer.net.interservice.message.LocalLLARequestInterserviceMessage;
 import org.dclayer.net.interservice.message.NetworkJoinNoticeInterserviceMessage;
 import org.dclayer.net.interservice.message.NetworkLeaveNoticeInterserviceMessage;
 import org.dclayer.net.interservice.message.NetworkPacketInterserviceMessage;
 import org.dclayer.net.interservice.message.TrustedSwitchInterserviceMessage;
 import org.dclayer.net.interservice.message.VersionInterserviceMessage;
 import org.dclayer.net.link.channel.data.ThreadDataChannel;
-import org.dclayer.net.llacache.CachedLLA;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.CachedLLA;
+import org.dclayer.net.lla.LLA;
 import org.dclayer.net.network.NetworkNode;
 import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.RemoteNetworkNode;
@@ -63,6 +64,7 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 	private long version = -1;
 	
 	private boolean ready = false;
+	private boolean alive = true;
 	
 	private InterservicePacket inInterservicePacket = new InterservicePacket(this);
 	private InterservicePacket outInterservicePacket = new InterservicePacket(this);
@@ -72,6 +74,8 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 	private CachedLLA cachedLLA;
 	private InterservicePolicy interservicePolicy;
 	
+	private LLA reportedLocalLLA;
+	
 	private AddressSlotMap remoteAddressSlotMap = new AddressSlotMap(this, true);
 	private AddressSlotMap localAddressSlotMap = new AddressSlotMap(this, false);
 	
@@ -80,6 +84,12 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 	
 	private ApplicationChannelSlotMap localApplicationChannelSlotMap = new ApplicationChannelSlotMap(false);
 	private ApplicationChannelSlotMap remoteApplicationChannelSlotMap = new ApplicationChannelSlotMap(true);
+	
+	private Thread llaRequestThread = new Thread(new Runnable() {
+		public void run() {
+			runLLARequestLoop();
+		}
+	});
 
 	public InterserviceChannel(DCLService dclService, InterserviceChannelActionListener interserviceChannelActionListener, CachedLLA cachedLLA, long channelId, String channelName) {
 		super(cachedLLA.getLink(), channelId, channelName);
@@ -111,6 +121,8 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 	public synchronized void onCloseChannel() {
 		
 		Log.msg(this, "channel closed");
+		
+		this.alive = false;
 		
 		for(NetworkSlot remoteNetworkSlot : remoteNetworkSlotMap) {
 			for(NetworkNode remoteNetworkNode : remoteNetworkSlot.getNetworkNodes()) {
@@ -245,6 +257,8 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 			startTrustedSwitch(addressSlot);
 		}
 		
+		this.llaRequestThread.start();
+		
 	}
 	
 	public boolean isReady() {
@@ -321,14 +335,6 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 			
 		}
 		
-		// if this address slot is not ready for joining networks yet, remember
-		// this node for joining it later
-		if(localAddressSlot.getConnectionBase() < CONNECTIONBASE_TRUSTED) {
-			localAddressSlot.addNetworkNodeToJoin(networkNode);
-			return;
-		}
-		
-		// else, just join it
 		joinNetwork(localAddressSlot, networkNode);
 		
 	}
@@ -353,7 +359,13 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 			
 			NetworkSlot remoteNetworkSlot = remoteNetworkSlotMap.find(networkNode.getNetworkType());
 			networkSlot.setRemoteEquivalent(remoteNetworkSlot);
-			if(remoteNetworkSlot != null) remoteNetworkSlot.setRemoteEquivalent(networkSlot);
+			if(remoteNetworkSlot != null) {
+				remoteNetworkSlot.setRemoteEquivalent(networkSlot);
+				
+				for(NetworkNode remoteNetworkNode : remoteNetworkSlot.getNetworkNodes()) {
+					interserviceChannelActionListener.onNewRemoteNetworkNode(this, remoteNetworkNode, networkSlot);
+				}
+			}
 			
 		}
 		
@@ -411,6 +423,24 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		applicationChannel.getApplicationSideApplicationChannelActionListener().onConnected(applicationChannel);
 		
 	}
+	
+	private void runLLARequestLoop() {
+		for(;;) {
+			
+			synchronized(this) {
+				if(!alive) break;
+				sendLLARequest(10); // TODO
+				sendLocalLLARequest(); // TODO maybe not every 10 seconds
+			}
+			
+			try {
+				Thread.sleep(10000);
+			} catch (InterruptedException e) {
+				return;
+			}
+			
+		}
+	}
 
 	@Override
 	public void readConstantly(ByteBuf byteBuf) {
@@ -460,8 +490,16 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		sendOutInterservicePacket();
 	}
 	
+	private synchronized void sendLLARequest(int limit) {
+		Log.debug(this, "sending LLA request for %d LLAs", limit);
+		outInterservicePacket
+		.setLLARequestInterserviceMessage()
+		.setLimit(limit);
+		sendOutInterservicePacket();
+	}
+	
 	private synchronized void sendLLAReply(List<LLA> llas) {
-		Log.debug(this, "sending LLA reply with %d LLAs", llas.size());
+		Log.debug(this, "sending LLA reply with %d LLAs: %s", llas.size(), Arrays.toString(llas.toArray()));
 		outInterservicePacket
 		.setLLAReplyInterserviceMessage()
 		.getLowerLevelAddressListComponent()
@@ -542,6 +580,17 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		sendOutInterservicePacket();
 	}
 	
+	private synchronized void sendLocalLLARequest() {
+		outInterservicePacket.setLocalLLARequestInterserviceMessage();
+		sendOutInterservicePacket();
+	}
+	
+	private synchronized void sendLocalLLAReplyInterserviceMessage(LLA localLLA) {
+		LocalLLAReplyInterserviceMessage localLLAReplyInterserviceMessage = outInterservicePacket.setLocalLLAReplyInterserviceMessage();
+		localLLAReplyInterserviceMessage.setLocalLLA(localLLA);
+		sendOutInterservicePacket();
+	}
+	
 	//
 	
 	private void onNetworkJoinNotice(AddressSlot remoteAddressSlot, final int networkSlotId, NetworkType networkType) {
@@ -596,10 +645,11 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		
 		NetworkSlot localNetworkSlot = localNetworkSlotMap.find(remoteNetworkSlot.getNetworkType());
 		
-		interserviceChannelActionListener.onNewRemoteNetworkNode(this, remoteNetworkNode, localNetworkSlot);
-		
 		remoteNetworkSlot.setRemoteEquivalent(localNetworkSlot);
-		if(localNetworkSlot != null) localNetworkSlot.setRemoteEquivalent(remoteNetworkSlot);
+		if(localNetworkSlot != null) {
+			localNetworkSlot.setRemoteEquivalent(remoteNetworkSlot);
+			interserviceChannelActionListener.onNewRemoteNetworkNode(this, remoteNetworkNode, localNetworkSlot);
+		}
 		
 	}
 	
@@ -682,15 +732,15 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		// TODO don't let the remote request infinite LLAs infinite times
 		int limit = (int) Math.min(Integer.MAX_VALUE, llaRequestInterserviceMessage.getLimit());
 		Log.debug(this, "received LLA request for at most %d LLAs", limit);
-		List<LLA> llas = this.dclService.getLLACache().getRandomLLAs(limit);
+		List<LLA> llas = this.dclService.getRandomConnectedLLAs(limit);
 		sendLLAReply(llas);
 	}
 	
 	public void onReceiveLLAReplyInterserviceMessage(LLAReplyInterserviceMessage llaReplyInterserviceMessage) {
 		// TODO don't let the remote flood you with this
 		List<LLA> llas = llaReplyInterserviceMessage.getLowerLevelAddressListComponent().getNewAddresses();
-		Log.debug(this, "received %d LLAs", llas.size());
-		dclService.storeLLAs(llas);
+		Log.debug(this, "received LLA reply message with %d LLAs: %s", llas.size(), Arrays.toString(llas.toArray()));
+		dclService.storeLLAs(llas, this.cachedLLA);
 	}
 	
 	public synchronized void onReceiveTrustedSwitchInterserviceMessage(TrustedSwitchInterserviceMessage trustedSwitchInterserviceMessage) {
@@ -878,11 +928,23 @@ public class InterserviceChannel extends ThreadDataChannel implements ServiceSid
 		
 	}
 	
-	public synchronized void onReceiveGroupMemberLLARequestInterserviceMessage(GroupMemberLLARequestInterserviceMessage groupMemberLLARequestInterserviceMessage) {
-		
+	public synchronized void onReceiveLocalLLARequestInterserviceMessage(LocalLLARequestInterserviceMessage localLLARequestInterserviceMessage) {
+		Log.debug(this, "received local lla request, replying with LLA %s", this.cachedLLA.getLLA());
+		sendLocalLLAReplyInterserviceMessage(this.cachedLLA.getLLA());
 	}
 	
-	public synchronized void onReceiveGroupMemberLLAReplyInterserviceMessage(GroupMemberLLAReplyInterserviceMessage groupMemberLLAReplyInterserviceMessage) {
+	public synchronized void onReceiveLocalLLAReplyInterserviceMessage(LocalLLAReplyInterserviceMessage localLLAReplyInterserviceMessage) {
+		
+		LLA reportedLocalLLA = localLLAReplyInterserviceMessage.getLocalLLA();
+		LLA oldReportedLocalLLA = this.reportedLocalLLA;
+		
+		this.reportedLocalLLA = reportedLocalLLA;
+		
+		Log.debug(this, "received local lla reply: %s (old: %s)", reportedLocalLLA, oldReportedLocalLLA);
+		
+		if(oldReportedLocalLLA == null || !oldReportedLocalLLA.equals(reportedLocalLLA)) {
+			interserviceChannelActionListener.onLocalLLAReport(this, oldReportedLocalLLA, reportedLocalLLA);
+		}
 		
 	}
 	

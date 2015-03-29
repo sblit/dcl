@@ -43,8 +43,7 @@ import org.dclayer.net.component.AbsKeyComponent;
 import org.dclayer.net.componentinterface.AbsKeyComponentI;
 import org.dclayer.net.crisp.CrispPacket;
 import org.dclayer.net.crisp.message.NeighborRequestCrispMessageI;
-import org.dclayer.net.interservice.InterservicePolicy;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 import org.dclayer.net.network.ApplicationNetworkInstance;
 import org.dclayer.net.network.NetworkInstance;
 import org.dclayer.net.network.NetworkInstanceCollection;
@@ -114,14 +113,14 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		try {
 			inputStream = socket.getInputStream();
 		} catch (IOException e) {
-			Log.exception(Log.PART_NET_TCPSOCKETCONNECTION, this, e);
+			Log.exception(this, e);
 			return;
 		}
 		
 		try {
 			outputStream = new BufferedOutputStream(socket.getOutputStream());
 		} catch (IOException e) {
-			Log.exception(Log.PART_NET_TCPSOCKETCONNECTION, this, e);
+			Log.exception(this, e);
 			return;
 		}
 		

@@ -1,10 +1,13 @@
-package org.dclayer.net.llacache;
+package org.dclayer.net.lla;
 
 import org.dclayer.listener.net.CachedLLAStatusListener;
+import org.dclayer.meta.HierarchicalLevel;
 import org.dclayer.net.Data;
 import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.interservice.InterservicePolicy;
 import org.dclayer.net.link.Link;
+import org.dclayer.net.lla.priority.LLAPriority;
+import org.dclayer.net.lla.priority.LLAPriorityAspect;
 
 /**
  * a class corresponding to a specific lower-level address and holding its assigned {@link Link} 
@@ -28,6 +31,7 @@ public class CachedLLA {
 	//
 	
 	private int status = DISCONNECTED;
+	private LLAPriority llaPriority = new LLAPriority(this);
 
 	private LLA lla;
 	
@@ -47,8 +51,11 @@ public class CachedLLA {
 	
 	private CachedLLAStatusListener cachedLLAStatusListener;
 	
-	public CachedLLA(LLA lla) {
+	private Data punchData;
+	
+	public CachedLLA(LLA lla, CachedLLAStatusListener cachedLLAStatusListener) {
 		this.lla = lla;
+		this.cachedLLAStatusListener = cachedLLAStatusListener;
 	}
 	
 	public synchronized int getStatus() {
@@ -115,17 +122,21 @@ public class CachedLLA {
 		return firstLinkPacketPrefixData;
 	}
 	
-	public void setCachedLLAStatusListener(CachedLLAStatusListener cachedLLAStatusListener) {
-		this.cachedLLAStatusListener = cachedLLAStatusListener;
+	public LLAPriorityAspect addLLAPriorityAspect(LLAPriority.Type type, HierarchicalLevel hierarchicalLevel, String identifier) {
+		return llaPriority.addLLAPriorityAspect(type, hierarchicalLevel, identifier);
 	}
 	
-	public CachedLLAStatusListener getCachedLLAStatusListener() {
-		return cachedLLAStatusListener;
+	public void setPunchData(Data punchData) {
+		this.punchData = punchData;
+	}
+	
+	public Data getPunchData() {
+		return punchData;
 	}
 	
 	@Override
 	public String toString() {
-		return String.format("%s (%s)", lla.toString(), STATUS_NAMES[status]);
+		return String.format("%s (%s) (%s)", lla.toString(), STATUS_NAMES[status], llaPriority);
 	}
 	
 }

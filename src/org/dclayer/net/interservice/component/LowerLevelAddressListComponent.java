@@ -8,7 +8,7 @@ import org.dclayer.exception.net.parse.ParseException;
 import org.dclayer.net.PacketComponent;
 import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.component.FlexNum;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 
 /**
  * a {@link PacketComponent} containing a list of {@link LowerLevelAddressComponent}s

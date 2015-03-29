@@ -39,7 +39,7 @@ import org.dclayer.net.applicationchannel.ApplicationChannelTarget;
 import org.dclayer.net.buf.StreamByteBuf;
 import org.dclayer.net.component.AbsKeyComponent;
 import org.dclayer.net.componentinterface.AbsKeyComponentI;
-import org.dclayer.net.llacache.LLA;
+import org.dclayer.net.lla.LLA;
 import org.dclayer.net.network.NetworkType;
 
 public class ApplicationInstance extends Thread implements A2SMessageReceiver {

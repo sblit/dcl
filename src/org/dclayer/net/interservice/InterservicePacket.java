@@ -11,8 +11,8 @@ import org.dclayer.net.interservice.message.ApplicationChannelSlotAssignInterser
 import org.dclayer.net.interservice.message.ConnectionbaseNoticeInterserviceMessage;
 import org.dclayer.net.interservice.message.CryptoChallengeReplyInterserviceMessage;
 import org.dclayer.net.interservice.message.CryptoChallengeRequestInterserviceMessage;
-import org.dclayer.net.interservice.message.GroupMemberLLAReplyInterserviceMessage;
-import org.dclayer.net.interservice.message.GroupMemberLLARequestInterserviceMessage;
+import org.dclayer.net.interservice.message.LocalLLAReplyInterserviceMessage;
+import org.dclayer.net.interservice.message.LocalLLARequestInterserviceMessage;
 import org.dclayer.net.interservice.message.IntegrationConnectRequestInterserviceMessage;
 import org.dclayer.net.interservice.message.IntegrationRequestInterserviceMessage;
 import org.dclayer.net.interservice.message.LLAReplyInterserviceMessage;
@@ -40,8 +40,8 @@ public class InterservicePacket extends PacketComponent {
 	public static final int NETWORK_LEAVE_NOTICE = 0x08;
 	public static final int INTEGRATION_REQUEST = 0x09;
 	public static final int INTEGRATION_CONNECT_REQUEST = 0x0a;
-	public static final int GROUP_MEMBER_LLA_REQUEST = 0x0b;
-	public static final int GROUP_MEMBER_LLA_REPLY = 0x0c;
+	public static final int LOCAL_LLA_REQUEST = 0x0b;
+	public static final int LOCAL_LLA_REPLY = 0x0c;
 	public static final int NETWORK_PACKET = 0x0d;
 	public static final int APPLICATION_CHANNEL_SLOT_ASSIGN = 0x0e;
 	public static final int APPLICATION_CHANNEL_DATA = 0x0f;
@@ -64,8 +64,8 @@ public class InterservicePacket extends PacketComponent {
 				/* 0x08 */ new NetworkLeaveNoticeInterserviceMessage(),
 				/* 0x09 */ new IntegrationRequestInterserviceMessage(),
 				/* 0x0a */ new IntegrationConnectRequestInterserviceMessage(),
-				/* 0x0b */ new GroupMemberLLARequestInterserviceMessage(),
-				/* 0x0c */ new GroupMemberLLAReplyInterserviceMessage(),
+				/* 0x0b */ new LocalLLARequestInterserviceMessage(),
+				/* 0x0c */ new LocalLLAReplyInterserviceMessage(),
 				/* 0x0d */ new NetworkPacketInterserviceMessage(networkPacketProvider),
 				/* 0x0e */ new ApplicationChannelSlotAssignInterserviceMessage(),
 				/* 0x0f */ new ApplicationChannelDataInterserviceMessage()
@@ -151,12 +151,12 @@ public class InterservicePacket extends PacketComponent {
 		return (IntegrationConnectRequestInterserviceMessage)(this.interserviceMessage = ownInterserviceMessages[INTEGRATION_CONNECT_REQUEST]);
 	}
 	
-	public GroupMemberLLARequestInterserviceMessage setGroupMemberLLARequestInterserviceMessage() {
-		return (GroupMemberLLARequestInterserviceMessage)(this.interserviceMessage = ownInterserviceMessages[GROUP_MEMBER_LLA_REQUEST]);
+	public LocalLLARequestInterserviceMessage setLocalLLARequestInterserviceMessage() {
+		return (LocalLLARequestInterserviceMessage)(this.interserviceMessage = ownInterserviceMessages[LOCAL_LLA_REQUEST]);
 	}
 	
-	public GroupMemberLLAReplyInterserviceMessage setGroupMemberLLAReplyInterserviceMessage() {
-		return (GroupMemberLLAReplyInterserviceMessage)(this.interserviceMessage = ownInterserviceMessages[GROUP_MEMBER_LLA_REPLY]);
+	public LocalLLAReplyInterserviceMessage setLocalLLAReplyInterserviceMessage() {
+		return (LocalLLAReplyInterserviceMessage)(this.interserviceMessage = ownInterserviceMessages[LOCAL_LLA_REPLY]);
 	}
 	
 	public NetworkPacketInterserviceMessage setNetworkPacketInterserviceMessage() {

@@ -1,4 +1,4 @@
-package org.dclayer.net.llacache;
+package org.dclayer.net.lla;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;

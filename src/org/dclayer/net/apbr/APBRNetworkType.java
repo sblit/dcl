@@ -11,6 +11,7 @@ import org.dclayer.net.network.NetworkType;
 import org.dclayer.net.network.component.NetworkPacket;
 import org.dclayer.net.network.component.NetworkPayload;
 import org.dclayer.net.network.properties.CommonNetworkPayloadProperties;
+import org.dclayer.net.network.routing.RouteQuality;
 import org.dclayer.net.network.routing.RoutingTable;
 import org.dclayer.net.network.slot.GenericNetworkSlot;
 
@@ -79,6 +80,11 @@ public class APBRNetworkType extends NetworkType<APBRNetworkType> {
 		
 		return scaledData;
 		
+	}
+	
+	@Override
+	public RouteQuality getRouteQuality(Data fromAddress, Data toAddress) {
+		return null;
 	}
 
 	@Override

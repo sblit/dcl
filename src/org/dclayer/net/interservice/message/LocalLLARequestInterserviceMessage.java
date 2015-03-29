@@ -7,49 +7,42 @@ import org.dclayer.net.buf.ByteBuf;
 import org.dclayer.net.interservice.InterserviceChannel;
 import org.dclayer.net.interservice.InterserviceMessage;
 import org.dclayer.net.interservice.InterservicePacket;
-import org.dclayer.net.interservice.component.LowerLevelAddressListComponent;
 
-public class GroupMemberLLAReplyInterserviceMessage extends InterserviceMessage {
-	
-	private LowerLevelAddressListComponent lowerLevelAddressListComponent = new LowerLevelAddressListComponent();
+public class LocalLLARequestInterserviceMessage extends InterserviceMessage {
 
 	@Override
 	public void read(ByteBuf byteBuf) throws ParseException, BufException {
-		lowerLevelAddressListComponent.read(byteBuf);
+		
 	}
 
 	@Override
 	public void write(ByteBuf byteBuf) throws BufException {
-		lowerLevelAddressListComponent.write(byteBuf);
+		
 	}
 
 	@Override
 	public int length() {
-		return lowerLevelAddressListComponent.length();
+		return 0;
 	}
 
 	@Override
 	public PacketComponent[] getChildren() {
-		return new PacketComponent[] { lowerLevelAddressListComponent };
+		return null;
 	}
 
 	@Override
 	public String toString() {
-		return "GroupMemberLLAReplyInterserviceMessage";
-	}
-	
-	public LowerLevelAddressListComponent getLowerLevelAddressListComponent() {
-		return lowerLevelAddressListComponent;
+		return "LocalLLARequestInterserviceMessage";
 	}
 
 	@Override
 	public int getTypeId() {
-		return InterservicePacket.GROUP_MEMBER_LLA_REPLY;
+		return InterservicePacket.LOCAL_LLA_REQUEST;
 	}
 
 	@Override
 	public void callOnReceiveMethod(InterserviceChannel interserviceChannel) {
-		interserviceChannel.onReceiveGroupMemberLLAReplyInterserviceMessage(this);
+		interserviceChannel.onReceiveLocalLLARequestInterserviceMessage(this);
 	}
 	
 }
