@@ -314,7 +314,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 			
 			boolean notify = localLLA == null;
 			localLLA = maxLLA;
-			if(notify) this.notify();
+			if(notify) localLLAReports.notify();
 			
 			Log.debug(this, "local LLA is %s (map updated due to transition from %s to %s by remote %s: %s)", localLLA, oldLocalLLA, newLocalLLA, interserviceChannel.getCachedLLA(), localLLAReports.toString());
 			
@@ -328,7 +328,7 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 				if(localLLA == null) {
 					Log.debug(this, "local LLA not known yet, waiting");
 					try {
-						this.wait();
+						localLLAReports.wait();
 					} catch (InterruptedException e) {}
 					Log.debug(this, "local LLA known, returning: %s", localLLA);
 				}
