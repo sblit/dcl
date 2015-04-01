@@ -17,7 +17,7 @@ public interface ApplicationConnectionActionListener extends NetworkInstanceList
 	public void onAddress(Address asymmetricKeyPairAddress);
 	public void onServiceNetworkPayload(NetworkPayload networkPayload, NetworkInstance networkInstance);
 	
-	public LLA getLocalLLA();
+	public LLA getLocalLLA(boolean wait);
 	
 	public Data getServiceIgnoreData();
 	

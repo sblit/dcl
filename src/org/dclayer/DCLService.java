@@ -105,11 +105,11 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 		
 		onAddress(localAddress);
 		
-		s2sDatagramSocket.setOnReceiveListener(this);
-		a2sStreamSocket.setApplicationConnectionActionListener(this);
-		
 		this.s2sDatagramSocket = s2sDatagramSocket;
 		this.a2sStreamSocket = a2sStreamSocket;
+		
+		s2sDatagramSocket.setOnReceiveListener(this);
+		a2sStreamSocket.setApplicationConnectionActionListener(this);
 		
 		this.connectionManager = new ConnectionManager(this, llaDatabase);
 		llaCache.setCachedLLAStatusListener(connectionManager);
@@ -143,11 +143,6 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 	
 	public List<LLA> getRandomConnectedLLAs(int limit) {
 		return connectionManager.getRandomConnectedLLAs(limit);
-	}
-
-	@Override
-	public LLA getLocalLLA() {
-		return localLLA;
 	}
 	
 	@Override
@@ -317,11 +312,29 @@ public class DCLService implements CrispMessageReceiver<NetworkInstance>, OnRece
 				}
 			}
 			
+			boolean notify = localLLA == null;
 			localLLA = maxLLA;
+			if(notify) this.notify();
 			
 			Log.debug(this, "local LLA is %s (map updated due to transition from %s to %s by remote %s: %s)", localLLA, oldLocalLLA, newLocalLLA, interserviceChannel.getCachedLLA(), localLLAReports.toString());
 			
 		}
+	}
+
+	@Override
+	public LLA getLocalLLA(boolean wait) {
+		if(localLLA == null && wait) {
+			synchronized(localLLAReports) {
+				if(localLLA == null) {
+					Log.debug(this, "local LLA not known yet, waiting");
+					try {
+						this.wait();
+					} catch (InterruptedException e) {}
+					Log.debug(this, "local LLA known, returning: %s", localLLA);
+				}
+			}
+		}
+		return localLLA;
 	}
 	
 	@Override

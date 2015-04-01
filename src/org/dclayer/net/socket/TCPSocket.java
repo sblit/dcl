@@ -24,11 +24,13 @@ public class TCPSocket extends Thread implements StreamSocket, HierarchicalLevel
 	public TCPSocket(int port) throws IOException {
 		this.serverSocket = new ServerSocket();
 		this.serverSocket.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), port));
-		this.start();
 	}
 	
 	@Override
 	public void run() {
+		
+		Log.msg(this, "listening for application connections on %s", serverSocket.getLocalSocketAddress());
+		
 		for(;;) {
 			
 			Socket connectionSocket;
@@ -41,25 +43,16 @@ public class TCPSocket extends Thread implements StreamSocket, HierarchicalLevel
 			
 			Log.debug(this, "new connection from %s:%d", connectionSocket.getInetAddress().toString(), connectionSocket.getPort());
 			
-			if(applicationConnectionActionListener == null) {
-				
-				Log.warning(this, "ignoring connection from %s, service not ready yet (closing connection)", connectionSocket.getInetAddress().toString());
-				try {
-					connectionSocket.close();
-				} catch (IOException e) {
-					Log.exception(this, e);
-				}
-				
-			} else {
-				applicationConnectionActionListener.onApplicationConnection(connectionSocket);
-			}
+			applicationConnectionActionListener.onApplicationConnection(connectionSocket);
 			
 		}
 	}
 
 	@Override
 	public void setApplicationConnectionActionListener(ApplicationConnectionActionListener applicationConnectionActionListener) {
+		boolean start = this.applicationConnectionActionListener == null;
 		this.applicationConnectionActionListener = applicationConnectionActionListener;
+		if(start) this.start();
 	}
 
 	@Override

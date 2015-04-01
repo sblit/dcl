@@ -426,10 +426,14 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 			networkPacket.setDestinationAddressData(destinationAddressData);
 			networkPayload.setDestinedForService(true);
 			
+			if(applicationConnectionActionListener.getLocalLLA(false) == null) {
+				Log.warning(this, "about to get local LLA from service, might block until it is known");
+			}
+			
 			NeighborRequestCrispMessageI neighborRequestCrispMessage = crispPacket.setNeighborRequestCrispMessage();
 			neighborRequestCrispMessage.setKeyPair(applicationNetworkInstance.getAddress().getKeyPair());
 			neighborRequestCrispMessage.setActionIdentifier(actionIdentifier);
-			neighborRequestCrispMessage.setSenderLLA(applicationConnectionActionListener.getLocalLLA());
+			neighborRequestCrispMessage.setSenderLLA(applicationConnectionActionListener.getLocalLLA(true));
 			neighborRequestCrispMessage.setResponse(response);
 			if(!response) {
 				neighborRequestCrispMessage.getIgnoreDataComponent().setData(applicationConnectionActionListener.getServiceIgnoreData());
@@ -662,9 +666,6 @@ public class ApplicationConnection extends Thread implements A2SMessageReceiver,
 		
 		ApplicationChannel applicationChannel = new ApplicationChannel(new ApplicationChannelTarget(remoteAddress, actionIdentifierSuffix), this, this);
 		ApplicationChannelSlot applicationChannelSlot = applicationChannelSlotMap.put(channelSlotId, applicationChannel);
-		
-		// TODO check if we're already connected
-//		todo_check_if_already_connected();
 		
 		requestNeighbor(applicationNetworkInstance, remoteAddress, actionIdentifierSuffix);
 		
