@@ -41,7 +41,18 @@ public class TCPSocket extends Thread implements StreamSocket, HierarchicalLevel
 			
 			Log.debug(this, "new connection from %s:%d", connectionSocket.getInetAddress().toString(), connectionSocket.getPort());
 			
-			applicationConnectionActionListener.onApplicationConnection(connectionSocket);
+			if(applicationConnectionActionListener == null) {
+				
+				Log.warning(this, "ignoring connection from %s, service not ready yet (closing connection)", connectionSocket.getInetAddress().toString());
+				try {
+					connectionSocket.close();
+				} catch (IOException e) {
+					Log.exception(this, e);
+				}
+				
+			} else {
+				applicationConnectionActionListener.onApplicationConnection(connectionSocket);
+			}
 			
 		}
 	}

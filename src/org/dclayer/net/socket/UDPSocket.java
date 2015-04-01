@@ -62,7 +62,14 @@ public class UDPSocket extends Thread implements DatagramSocket, HierarchicalLev
 				Log.exception(this, e);
 				return;
 			}
-			this.onReceiveListener.onReceiveS2S(inetSocketAddress, data);
+			
+			if(this.onReceiveListener == null) {
+				
+				Log.warning(this, "ignoring datagram from %s, service not ready yet", p.getSocketAddress().toString());
+				
+			} else {
+				this.onReceiveListener.onReceiveS2S(inetSocketAddress, data);
+			}
 			
 		}
 	}
