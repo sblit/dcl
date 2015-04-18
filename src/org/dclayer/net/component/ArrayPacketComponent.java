@@ -145,23 +145,21 @@ public abstract class ArrayPacketComponent<T extends PacketComponentI> extends P
 	
 	public void setElements(int numElements) {
 		
-		Element element = null;
+		Element element = chainEnd;
 		
-		for(int i = chainTotalLength; i < numElements; i++) {
+		while(chainTotalLength < numElements) {
+			
+			chainEnd = new Element();
 			
 			if(element == null) {
-				if(chain == null) {
-					chain = chainEnd = new Element();
-					chainTotalLength++;
-				}
-				element = chainEnd;
+				chain = chainEnd;
 			} else {
-				if(element.next == null) {
-					element.next = chainEnd = new Element();
-					chainTotalLength++;
-				}
-				element = element.next;
+				element.next = chainEnd;
 			}
+			
+			element = chainEnd;
+			
+			chainTotalLength++;
 			
 		}
 		
